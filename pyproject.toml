@@ -1,0 +1,113 @@
+[project]
+name = "bft-pmc"
+version = "0.1.0"
+description = "Predictive Monte Carlo analysis of Bayes-filtered transformers"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+dependencies = [
+    "einops>=0.8.0",
+    "jaxtyping>=0.3.3",
+    "matplotlib>=3.10.7",
+    "pandas>=2.2.3",
+    "pfn-transformerlens",
+    "pyyaml>=6.0.3",
+    "scipy",
+    "seaborn>=0.13.2",
+    "torch>=2.9.0",
+    "tqdm>=4.66.0",
+    "transformer-lens>=2.16.1",
+    "tyro>=0.9.35",
+]
+
+[project.urls]
+Repository = "https://github.com/afiq-aswadi/bft-pmc"
+
+[project.optional-dependencies]
+wandb = ["wandb>=0.18.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.uv.sources]
+pfn-transformerlens = { path = "pfn_transformers", editable = true }
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "pfn_transformers/tests"]
+pythonpath = ["."]
+addopts = [
+    "--cov",
+    "--cov-config=pyproject.toml",
+    "--cov-report=term-missing",
+    "--cov-report=xml",
+]
+
+[tool.coverage.run]
+source = ["."]
+omit = [
+    "tests/*",
+    "pfn_transformers/tests/*",
+    "pfn_transformers/cookbooks/*",
+]
+
+[tool.coverage.report]
+fail_under = 100
+show_missing = true
+skip_covered = true
+
+[tool.ruff.lint]
+ignore = ["ANN002", "ANN003", "F821", "F722"]
+
+# pyproject.toml
+[tool.ty.rules]
+# keep global defaults; tweak per-folder below
+unresolved-attribute = "ignore"
+invalid-assignment     = "warn"
+invalid-context-manager = "ignore"  # wandb.init() works as context manager despite type stubs
+
+
+[[tool.ty.overrides]]
+include = ["pfn_transformerlens/**", "tests/**"]
+[tool.ty.overrides.rules]
+# Test doubles intentionally implement only the protocol surface under test.
+invalid-argument-type = "ignore"
+invalid-attribute-access = "ignore"
+invalid-assignment = "ignore"
+
+[[tool.ty.overrides]]
+include = ["pfn_transformers/**"]
+[tool.ty.overrides.rules]
+# PyTorch Distribution and TransformerLens stubs do not model these dynamic APIs.
+call-non-callable = "ignore"
+invalid-argument-type = "ignore"
+invalid-method-override = "ignore"
+invalid-return-type = "ignore"
+invalid-type-form = "ignore"
+no-matching-overload = "ignore"
+not-subscriptable = "ignore"
+unsupported-operator = "ignore"
+
+[[tool.ty.overrides]]
+include = [
+    "linear_regression/analysis/runner.py",
+    "linear_regression/distribution_dynamics.py",
+]
+[tool.ty.overrides.rules]
+# NumPy's savez stub reserves allow_pickle inside arbitrary keyword mappings.
+invalid-argument-type = "ignore"
+
+[[tool.ty.overrides]]
+include = ["**/*.ipynb"]
+[tool.ty.overrides.rules]
+call-non-callable = "warn"
+invalid-argument-type = "warn"
+invalid-method-override = "warn"
+invalid-type-form = "warn"
+no-matching-overload = "warn"
+not-subscriptable = "warn"

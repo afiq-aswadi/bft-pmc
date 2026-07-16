@@ -1,0 +1,51 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pfn-transformerlens"
+version = "0.1.0"
+description = "Prior-Fitted Networks with transformer-lens: A library for training and using PFN models"
+readme = "README.md"
+requires-python = ">=3.13"
+license = "MIT"
+dependencies = [
+    "einops>=0.8.0",
+    "jaxtyping>=0.3.3",
+    "torch>=2.9.0",
+    "tqdm>=4.66.0",
+    "transformer-lens>=2.16.1",
+]
+
+[project.optional-dependencies]
+examples = [
+    "matplotlib>=3.10.7",
+    "seaborn>=0.13.2",
+    "tyro>=0.9.35",
+]
+wandb = ["wandb>=0.18.0"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["pfn_transformerlens"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-cov>=7.0.0",
+]
+
+[tool.ruff.lint]
+ignore = ["ANN002", "ANN003", "F821", "F722"]
+
+# pyproject.toml
+[tool.ty.rules]
+# keep global defaults; tweak per-folder below
+unresolved-attribute = "ignore"
+invalid-assignment     = "warn"
+
+
+[[tool.ty.overrides]]
+include = ["pfn_transformerlens/**", "tests/**"]
+[tool.ty.overrides.rules]
+invalid-argument-type  = "warn"
+invalid-attribute-access = "warn"

@@ -1,0 +1,15 @@
+# Base Python dependencies for local reproduction without optional W&B logging.
+# For W&B-backed runs, either install `wandb>=0.18.0` separately or use
+# `uv sync --extra wandb`.
+
+einops>=0.8.0
+jaxtyping>=0.3.3
+matplotlib>=3.10.7
+pandas>=2.2.3
+scipy
+seaborn>=0.13.2
+torch>=2.9.0
+tqdm>=4.66.0
+transformer-lens>=2.16.1
+tyro>=0.9.35
+-e ./pfn_transformers

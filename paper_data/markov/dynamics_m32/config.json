@@ -1,0 +1,18 @@
+{
+  "k": 10,
+  "seed": 42,
+  "d_model": 64,
+  "seq_len": 1024,
+  "n_chains": 32,
+  "max_steps": 100000,
+  "num_heads": 4,
+  "batch_size": 128,
+  "num_layers": 2,
+  "rope_theta": 10000,
+  "context_len": 400,
+  "eval_interval": 200,
+  "learning_rate": 0.0006,
+  "num_eval_trials": 10,
+  "expansion_factor": 4,
+  "delta_eval_batch_size": 16
+}

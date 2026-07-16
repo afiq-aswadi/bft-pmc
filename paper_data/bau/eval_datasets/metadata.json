@@ -1,0 +1,8 @@
+{
+  "alpha_value": 1.0,
+  "seq_len": 16,
+  "batch_size": 128,
+  "seed": 42,
+  "generated_at": "2026-04-21T06:53:55",
+  "checkpoint_dir": "checkpoints/bau_num_tasks_sweep"
+}

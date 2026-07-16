@@ -1,0 +1,8 @@
+k: 10
+seq_len: 1024
+n_chains: 128
+batch_size: 128
+learning_rate: 0.0006
+eval_interval: 200
+max_steps: 100000
+num_eval_trials: 10

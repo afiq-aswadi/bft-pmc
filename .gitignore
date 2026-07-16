@@ -1,0 +1,56 @@
+# Python bytecode and environments
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.python-version
+
+# build and test artifacts
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# local configuration and agent state
+.env
+.claude/
+.cursor/
+
+# experiment outputs and large model artifacts
+artifacts/
+checkpoints/
+outputs/
+outputs.bak-*/
+wandb/
+*.ckpt
+*.pt
+*.pth
+
+# private manuscript and exploratory work
+docs/
+*.ipynb
+.ipynb_checkpoints/
+prototypes/
+
+# generated bundles and figures
+bundle_export/
+submission_bundle/
+source_bundle/
+figures/
+/grid_beta_bernoulli.png
+/image*.png
+/image*.jpg
+/image*.jpeg
+
+# operating-system metadata
+.DS_Store
+**/.DS_Store
+
+# legacy nested checkout
+legacy_nested_checkout/

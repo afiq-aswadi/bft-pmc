@@ -1,0 +1,44 @@
+{
+  "checkpoint_dir": "checkpoints/num_tasks_sweep",
+  "eval_batch_size": 64,
+  "seq_len": 64,
+  "noise_std": 0.5,
+  "seed": 42,
+  "eval_position": null,
+  "compute_laplace": true,
+  "laplace_b": 1.0,
+  "laplace_variance_match": true,
+  "laplace_n_samples": 500,
+  "laplace_n_warmup": 200,
+  "laplace_method": "hmc",
+  "laplace_target_accept": 0.8,
+  "laplace_n_leapfrog": 20,
+  "compute_distribution_metrics": true,
+  "prompt_sources": [
+    "gaussian",
+    "discrete"
+  ],
+  "prompt_lengths": [
+    0,
+    8
+  ],
+  "n_prompts": [
+    50
+  ],
+  "n_samples": [
+    100
+  ],
+  "n_samples_prior": [
+    3000
+  ],
+  "n_projections": 100,
+  "predictive_steps": 56,
+  "long_rollout_method": "clip",
+  "plot_dmmse_marginals": true,
+  "include_random_eval": true,
+  "separate_eval_prompts": false,
+  "eval_n_prompts": 50,
+  "eval_prompt_length": 8,
+  "output_dir": "outputs/sweep_analysis",
+  "eval_dataset_dir": "outputs/eval_datasets/20260323"
+}

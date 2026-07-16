@@ -1,0 +1,50 @@
+concurrent_per_device: 2
+
+commands:
+- >-
+  CUDA_VISIBLE_DEVICES=~DEVICE~
+  uv run train.py markov
+  --config-path markov/train.yaml
+  --n-chains ~N_CHAINS~
+  --checkpoint-root checkpoints/markov/task_diversity
+  --output-root outputs/markov/training
+  --use-wandb
+  --wandb-project markov-transformer-sweeps
+
+parameters:
+  all:
+    devices:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+  gpu0:
+    N_CHAINS:
+    - '4'
+    - '2048'
+  gpu1:
+    N_CHAINS:
+    - '8'
+    - '1024'
+  gpu2:
+    N_CHAINS:
+    - '16'
+  gpu3:
+    N_CHAINS:
+    - '32'
+  gpu4:
+    N_CHAINS:
+    - '64'
+  gpu5:
+    N_CHAINS:
+    - '128'
+  gpu6:
+    N_CHAINS:
+    - '256'
+  gpu7:
+    N_CHAINS:
+    - '512'

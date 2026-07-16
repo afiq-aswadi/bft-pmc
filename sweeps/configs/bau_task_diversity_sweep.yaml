@@ -1,0 +1,71 @@
+commands:
+- >-
+  CUDA_VISIBLE_DEVICES=~DEVICE~
+  uv run train.py bau
+  --num-tasks ~NUM_TASKS~
+  --vocab-size 12
+  --alpha-value 1.0
+  --d-model 64
+  --d-mlp 256
+  --n-layers 2
+  --n-heads 1
+  --d-head 64
+  --n-ctx 256
+  --act-fn gelu
+  --batch-size 64
+  --seq-len 256
+  --num-steps 100000
+  --learning-rate 5e-4
+  --warmup-steps 0
+  --save-checkpoint
+  --checkpoint-schedule logarithmic
+  --linear-checkpoint-interval 500
+  --n-log-checkpoints 200
+  --checkpoint-root checkpoints/bau/task_diversity
+  --use-wandb
+  --no-wandb-log-model
+  --seed 42
+  --eval-every 1000
+  --eval-batches 10
+  --log-file checkpoints/bau/task_diversity/logs/num_tasks_~NUM_TASKS~.json
+
+parameters:
+  all:
+    devices:
+    - '0'
+    - '1'
+    - '2'
+    - '3'
+    - '4'
+    - '5'
+    - '6'
+    - '7'
+  gpu0:
+    NUM_TASKS:
+    - '1'
+    - '256'
+  gpu1:
+    NUM_TASKS:
+    - '2'
+    - '512'
+  gpu2:
+    NUM_TASKS:
+    - '4'
+    - '1024'
+  gpu3:
+    NUM_TASKS:
+    - '8'
+    - '2048'
+  gpu4:
+    NUM_TASKS:
+    - '16'
+    - '4096'
+  gpu5:
+    NUM_TASKS:
+    - '32'
+  gpu6:
+    NUM_TASKS:
+    - '64'
+  gpu7:
+    NUM_TASKS:
+    - '128'

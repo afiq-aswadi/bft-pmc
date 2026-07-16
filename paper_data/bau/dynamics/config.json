@@ -1,0 +1,16 @@
+{
+  "run_id": "7gem57bz",
+  "checkpoint_dir": "checkpoints/bau_num_tasks_sweep",
+  "eval_dataset_dir": "outputs/eval_datasets/bau/20260421",
+  "compute_delta": true,
+  "compute_distribution": true,
+  "compute_prior_mode": true,
+  "n_samples": 100,
+  "predictive_steps": 256,
+  "n_projections": 100,
+  "chunk_size": 100,
+  "alpha_value": 1.0,
+  "checkpoint_subsample": 5,
+  "output_dir": "outputs/bau_pipeline_td32/distribution_dynamics",
+  "seed": 42
+}

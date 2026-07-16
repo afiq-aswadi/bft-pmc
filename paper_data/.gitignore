@@ -1,0 +1,8 @@
+# Un-ignore data assets that the global gitignore excludes by extension.
+# paper_data/ is committed data; track it regardless of extension.
+!*.csv
+!*.npz
+
+# Figures are regenerable from the data files; keep them out of the repo.
+*.png
+*.pdf

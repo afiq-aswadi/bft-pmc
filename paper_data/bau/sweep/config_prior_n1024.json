@@ -1,0 +1,15 @@
+{
+  "checkpoint_dir": "checkpoints/bau_num_tasks_sweep",
+  "eval_dataset_dir": "paper_data/bau/eval_datasets",
+  "seed": 42,
+  "compute_distribution_metrics": true,
+  "compute_prior_mode": true,
+  "prior_only_distribution": true,
+  "n_samples": 100,
+  "n_samples_prior": 1024,
+  "n_projections": 100,
+  "predictive_steps": 256,
+  "chunk_size": 100,
+  "alpha_value": 1.0,
+  "output_dir": "outputs/bau_sweep_analysis_prior_n1024"
+}
