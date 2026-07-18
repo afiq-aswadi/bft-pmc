@@ -84,6 +84,11 @@ commands are documented in
 [`paper_data/README.md`](paper_data/README.md#generate-sample-bundles-for-marginal-plots).
 See the same document for individual aggregate-figure commands.
 
+Every paper figure, its generator (in the public layout), its inputs, and
+where those inputs live are catalogued in
+[`paper_data/FIGURE_PROVENANCE.md`](paper_data/FIGURE_PROVENANCE.md); consult it
+together with `scripts/reproduce_paper.sh` when regenerating figures.
+
 ## Quick training smoke runs
 
 The unified training entry point dispatches to each task family:
@@ -104,7 +109,13 @@ uv run train.py beta-bernoulli
 ```
 
 To rerun only PMC and plotting from an existing checkpoint, pass
-`--checkpoint-path path/to/checkpoint.pt`.
+`--checkpoint-path path/to/checkpoint.pt`. To regenerate the Beta-Bernoulli
+grid from the committed samples without training, pass
+`--replot-from paper_data/beta_bernoulli/pmc_samples.npz`.
+
+The paper runs use a fixed random seed of 42 for the three main task families
+(linear regression, balls-and-urns, and Markov) and 0 for the Beta-Bernoulli
+experiment.
 
 Use `uv run train.py --help` or place `--help` after a task family for the full
 CLI. The paper sweeps are defined by reviewable YAML files:

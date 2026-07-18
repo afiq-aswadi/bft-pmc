@@ -25,6 +25,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from plotting.paper_style import apply_paper_style
+
 
 SERIES = [
     ("Memorizing", "-", "tab:green"),
@@ -35,10 +37,10 @@ SERIES = [
 def _style_ax(ax: plt.Axes, ylabel: str | None = None) -> None:
     ax.set_yscale("log")
     ax.set_xscale("log")
-    ax.set_xlabel("Training step", fontsize=16)
+    ax.set_xlabel("Training step")
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=16)
-    ax.tick_params(axis="both", which="major", labelsize=13)
+        ax.set_ylabel(ylabel)
+    ax.tick_params(axis="both", which="major")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(True, alpha=0.3, linestyle="--")
@@ -100,12 +102,13 @@ def _process_run(
     # 2x2 (KL, ED) drops SW for the paper-ready version.
     for layout, suffix in [("2x3", ""), ("2x2", "_2x2")]:
         n_cols = 3 if layout == "2x3" else 2
+        apply_paper_style(4.2 * n_cols, 0.49 if n_cols == 2 else 0.95)
         fig, axes = plt.subplots(
-            2, n_cols, figsize=(6 * n_cols, 8), constrained_layout=True, sharey="col"
+            2, n_cols, figsize=(4.2 * n_cols, 6.2), constrained_layout=True, sharey="col"
         )
 
         row_labels = ["In-distribution", "Out-of-distribution"]
-        ylabels = ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"][:n_cols]
+        ylabels = ["Symmetrized KL", "Energy distance", "Sliced Wasserstein"][:n_cols]
 
         for row_idx, source in enumerate(("in_distribution", "out_of_distribution")):
             sub = _filter_prompt_source(df, source)
@@ -121,16 +124,24 @@ def _process_run(
         for row_idx, row_label in enumerate(row_labels):
             axes[row_idx, 0].annotate(
                 row_label,
-                xy=(-0.28, 0.5),
+                xy=(-0.55, 0.5),
                 xycoords="axes fraction",
                 ha="center",
                 va="center",
-                fontsize=16,
+                fontsize=plt.rcParams["axes.labelsize"],
                 rotation=90,
             )
 
-        if axes[0, 1].get_legend_handles_labels()[0]:
-            axes[0, -1].legend(loc="upper right", frameon=False, fontsize=14)
+        handles, labels = axes[0, 1].get_legend_handles_labels()
+        if handles:
+            fig.legend(
+                handles,
+                labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 1.12),
+                ncol=len(handles),
+                frameon=False,
+            )
 
         out_path = out_dir / f"dynamics_M{n_chains}{suffix}.png"
         fig.savefig(out_path, dpi=300, bbox_inches="tight")

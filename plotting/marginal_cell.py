@@ -36,6 +36,13 @@ from scipy.stats import gaussian_kde
 #   Pi_infty = population prior (continuous, generalising)        -> blue curve
 COLORS = {"pmc": "goldenrod", "mem": "tab:green", "gen": "tab:blue"}
 LABELS = {"pmc": "PMC", "mem": r"$\Pi_M$", "gen": r"$\Pi_\infty$"}
+# Posterior panels must not reuse the prior symbols: the green/blue objects
+# there are the posteriors induced by those priors.
+LABELS_POSTERIOR = {
+    "pmc": "PMC",
+    "mem": r"$\Pi^{\mathrm{mem}}(\cdot \mid c)$",
+    "gen": r"$\Pi^{\mathrm{gen}}(\cdot \mid c)$",
+}
 
 N_BINS = 60  # histogram bins over the cell range
 N_GRID = 500  # points for analytic curves
@@ -274,10 +281,15 @@ def draw_cdf_cell(
     ax.set_ylim(0.0, 1.0)
 
 
-def legend_handles() -> list[Line2D]:
-    """Return legend handles in fixed PMC, finite-pool, population order."""
+def legend_handles(posterior: bool = False) -> list[Line2D]:
+    """Return legend handles in fixed PMC, finite-pool, population order.
+
+    Pass posterior=True for posterior panels, where the green/blue objects
+    are the induced posteriors rather than the priors themselves.
+    """
+    labels = LABELS_POSTERIOR if posterior else LABELS
     return [
-        Line2D([0], [0], color=COLORS["pmc"], lw=2, label=LABELS["pmc"]),
-        Line2D([0], [0], color=COLORS["mem"], lw=2, label=LABELS["mem"]),
-        Line2D([0], [0], color=COLORS["gen"], lw=2, label=LABELS["gen"]),
+        Line2D([0], [0], color=COLORS["pmc"], lw=2, label=labels["pmc"]),
+        Line2D([0], [0], color=COLORS["mem"], lw=2, label=labels["mem"]),
+        Line2D([0], [0], color=COLORS["gen"], lw=2, label=labels["gen"]),
     ]

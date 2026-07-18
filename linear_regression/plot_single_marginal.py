@@ -27,6 +27,7 @@ from plotting.marginal_cell import (
     legend_handles,
     ref_quantiles,
 )
+from plotting.paper_style import apply_paper_style
 
 
 def main(
@@ -70,6 +71,7 @@ def main(
         generalising = norm(loc=mu, scale=sigma)
     lo, hi = cell_xrange(pmc, ref=ref_quantiles(generalising.ppf))
 
+    apply_paper_style(figsize[0], 0.40)
     fig, ax = plt.subplots(figsize=figsize, constrained_layout=True)
     draw_density_cell(
         ax,
@@ -88,7 +90,10 @@ def main(
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.legend(
-        handles=legend_handles(), frameon=False, fontsize="small", loc="upper left"
+        handles=legend_handles(posterior=not is_prior),
+        frameon=False,
+        fontsize="small",
+        loc="upper left",
     )
 
     out_path.parent.mkdir(parents=True, exist_ok=True)

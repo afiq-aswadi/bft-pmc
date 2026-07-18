@@ -26,6 +26,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import tyro
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 from scipy.stats import beta as beta_dist
 
 from balls_and_urns.dataset import load_predictive_samples
@@ -37,6 +38,7 @@ from plotting.marginal_cell import (
     legend_handles,
     ref_quantiles,
 )
+from plotting.paper_style import apply_paper_style
 
 SOURCE_LABELS = {
     "prior": "Prior rollout",
@@ -72,6 +74,9 @@ def plot_stitched(
     V_full = entries[0][1]["model_samples"].shape[2]
     V = min(num_dims, V_full) if num_dims else V_full
     n_M = len(entries)
+    figure_is_prior = str(entries[0][1]["prompt_source"]) == "prior"
+
+    apply_paper_style(1.9 * V, 0.95)
 
     fig, axes = plt.subplots(
         n_M,
@@ -79,6 +84,7 @@ def plot_stitched(
         figsize=(1.9 * V, 1.3 * n_M),
         constrained_layout=True,
     )
+    fig.get_layout_engine().set(w_pad=0.06, h_pad=0.06)
     axes = np.atleast_2d(axes)
     if n_M == 1:
         axes = axes.reshape(1, -1)
@@ -126,15 +132,30 @@ def plot_stitched(
                 )
 
             if k == 0:
-                ax.set_ylabel(f"$M={M}$", fontsize="small")
+                ax.set_ylabel(
+                    f"$M={M}$",
+                    fontsize="x-small",
+                    rotation=0,
+                    ha="right",
+                    va="center",
+                    labelpad=14,
+                )
             if row == 0:
-                ax.set_title(f"Class {k + 1}", fontsize="small")
+                ax.set_title(f"Class {k + 1}", fontsize="x-small")
             ax.tick_params(labelsize="xx-small")
+            ax.xaxis.set_major_locator(MaxNLocator(2))
+            ax.yaxis.set_major_locator(MaxNLocator(2))
+            ax.xaxis.set_major_formatter(FormatStrFormatter("%g"))
+            ax.yaxis.set_major_formatter(FormatStrFormatter("%g"))
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
 
-    axes[0, 0].legend(
-        handles=legend_handles(), frameon=False, fontsize="xx-small", loc="best"
+    fig.legend(
+        handles=legend_handles(posterior=not figure_is_prior),
+        loc="outside upper center",
+        ncol=3,
+        frameon=False,
+        fontsize="x-small",
     )
     _save_publication(fig, output_path)
     plt.close(fig)

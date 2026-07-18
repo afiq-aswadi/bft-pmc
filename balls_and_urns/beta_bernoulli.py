@@ -24,6 +24,7 @@ from balls_and_urns.predictive_monte_carlo import (
 from pfn_transformerlens import TrainingConfig, UnsupervisedConfig, train
 from pfn_transformerlens.checkpointing import load_checkpoint
 from pfn_transformerlens.model.PFN import UnsupervisedPFN
+from plotting.paper_style import apply_paper_style
 
 
 @dataclass(frozen=True)
@@ -81,6 +82,9 @@ class BetaBernoulliConfig:
     wandb_project: str | None = None
     wandb_entity: str | None = None
     plot_dpi: int = 400
+    # Path to a previously saved pmc_samples.npz; when set, skip training and
+    # rollouts and regenerate the paper figure from the stored samples.
+    replot_from: Path | None = None
 
     def validate(self) -> None:
         positive_integers = (
@@ -280,6 +284,7 @@ def plot_pmc_grid(
     x = np.linspace(1e-4, 1.0 - 1e-4, 500)
     bins = np.linspace(0.0, 1.0, 61)
     colors = plt.get_cmap("viridis")
+    apply_paper_style(9, 1.0)
     fig, axes = plt.subplots(
         3,
         3,
@@ -330,7 +335,6 @@ def plot_pmc_grid(
         ax.set_title(
             rf"$\theta^\star={results.theta_stars[index]:.1f}$: "
             f"{num_ones} ones, {num_zeros} zeros",
-            fontsize=10,
         )
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
@@ -341,12 +345,10 @@ def plot_pmc_grid(
         ax.set_xlabel(r"$\theta$")
 
     handles, labels = axes[0, 0].get_legend_handles_labels()
-    fig.suptitle("Beta-Bernoulli PMC prior and posterior")
     fig.legend(
         handles,
         labels,
-        loc="upper center",
-        bbox_to_anchor=(0.5, 0.0),
+        loc="outside upper center",
         ncol=4,
         frameon=False,
     )
@@ -360,11 +362,48 @@ def plot_pmc_grid(
     plt.close(fig)
 
 
+def load_pmc_results(npz_path: Path) -> PMCResults:
+    """Rebuild PMCResults from a saved samples archive.
+
+    Accepts both the archive written by this script
+    (``theta_stars``/``prompts``/``prior_samples``/...) and the legacy grid
+    archive shipped in ``paper_data/beta_bernoulli`` whose keys are prefixed
+    with ``grid_``.
+    """
+    data = np.load(npz_path)
+    if "posterior_samples" in data.files:
+        return PMCResults(
+            theta_stars=np.asarray(data["theta_stars"]),
+            prompts=np.asarray(data["prompts"]),
+            prior_samples=np.asarray(data["prior_samples"]),
+            posterior_samples=np.asarray(data["posterior_samples"]),
+            posterior_alpha=np.asarray(data["posterior_alpha"]),
+            posterior_beta=np.asarray(data["posterior_beta"]),
+        )
+    return PMCResults(
+        theta_stars=np.asarray(data["grid_theta_stars"]),
+        prompts=np.asarray(data["grid_prompts"]),
+        prior_samples=np.asarray(data["grid_prior_theta_samples"]),
+        posterior_samples=np.asarray(data["grid_theta_samples_post"]),
+        posterior_alpha=np.asarray(data["grid_alpha_post"]),
+        posterior_beta=np.asarray(data["grid_beta_post"]),
+    )
+
+
 def main(config: BetaBernoulliConfig) -> None:
     config.validate()
     config.output_dir.mkdir(parents=True, exist_ok=True)
     with (config.output_dir / "config.json").open("w", encoding="utf-8") as handle:
         json.dump(asdict(config), handle, indent=2, default=str)
+
+    if config.replot_from is not None:
+        results = load_pmc_results(config.replot_from)
+        plot_pmc_grid(
+            results,
+            config,
+            config.output_dir / "beta_bernoulli_pmc_grid",
+        )
+        return
 
     if config.checkpoint_path is None:
         model = train_beta_bernoulli(config)

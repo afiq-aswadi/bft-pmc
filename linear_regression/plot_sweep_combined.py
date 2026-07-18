@@ -23,6 +23,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tyro
 
+from plotting.paper_style import apply_paper_style
+
 
 @dataclass
 class PlotConfig:
@@ -36,18 +38,18 @@ SERIES = [
     ("Generalizing", "s-", "tab:blue", 5),
 ]
 SERIES_PRIOR = [
-    (r"$\Pi_M$", "o-", "tab:green", 5),
-    (r"$\Pi_\infty$", "s-", "tab:blue", 5),
+    ("Memorizing", "o-", "tab:green", 5),
+    ("Generalizing", "s-", "tab:blue", 5),
 ]
 
 
 def style_ax(ax: plt.Axes, ylabel: str | None = None) -> None:
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
-    ax.set_xlabel(r"$M$", fontsize=16)
+    ax.set_xlabel(r"$M$")
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=16)
-    ax.tick_params(axis="both", which="major", labelsize=13)
+        ax.set_ylabel(ylabel)
+    ax.tick_params(axis="both", which="major")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(True, alpha=0.3, linestyle="--")
@@ -109,8 +111,9 @@ def main(config: PlotConfig) -> None:
                 "Sliced Wasserstein",
             ][:n_cols]
             row_labels = ["In-distribution", "Out-of-distribution"]
-            figsize = (5.5 * n_cols, 8)
+            figsize = (4.2 * n_cols, 6.2)
 
+            apply_paper_style(figsize[0], 0.49 if n_cols == 2 else 0.95)
             fig, axes = plt.subplots(
                 2, n_cols, figsize=figsize, constrained_layout=True, sharey="col"
             )
@@ -176,23 +179,47 @@ def main(config: PlotConfig) -> None:
             for row_idx, row_label in enumerate(row_labels):
                 axes[row_idx, 0].annotate(
                     row_label,
-                    xy=(-0.28, 0.5),
+                    xy=(-0.55, 0.5),
                     xycoords="axes fraction",
                     ha="center",
                     va="center",
-                    fontsize=16,
+                    fontsize=plt.rcParams["axes.labelsize"],
                     rotation=90,
                 )
 
-            if axes[0, 0].get_legend_handles_labels()[0]:
-                axes[0, -1].legend(loc="upper right", frameon=False, fontsize=14)
+            handles, labels = axes[0, 0].get_legend_handles_labels()
+            if handles:
+                fig.legend(
+                    handles,
+                    labels,
+                    loc="upper center",
+                    bbox_to_anchor=(0.5, 1.12),
+                    ncol=len(handles),
+                    frameon=False,
+                )
 
             out_path = output_dir / f"sweep_combined{suffix}.png"
             fig.savefig(out_path, dpi=300, bbox_inches="tight")
             plt.close(fig)
+
+        # single-panel ED (in-distribution) for the intro preview figure
+        apply_paper_style(5.5, 0.44)
+        fig, ax = plt.subplots(figsize=(5.5, 4), constrained_layout=True)
+        plot_series(
+            ax,
+            indist_df["num_tasks"],
+            ["dist/ed_vs_baseline_memorising", "dist/ed_vs_baseline_generalising"],
+            indist_df,
+        )
+        style_ax(ax, "Energy distance")
+        ax.legend(frameon=False)
+        out_path = output_dir / "sweep_ed_id_1x1.png"
+        fig.savefig(out_path, dpi=300, bbox_inches="tight")
+        plt.close(fig)
         return
     else:
         # prior mode: 1 row x 2 cols (ED, SW) -- no prediction metrics
+        apply_paper_style(12, 0.95)
         fig, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
 
         ylabels = ["Energy distance", "Sliced Wasserstein"]
@@ -221,8 +248,16 @@ def main(config: PlotConfig) -> None:
         for col_idx, ylabel in enumerate(ylabels):
             style_ax(axes[col_idx], ylabel)
 
-        if axes[0].get_legend_handles_labels()[0]:
-            axes[-1].legend(loc="upper right", frameon=False, fontsize=14)
+        handles, labels = axes[0].get_legend_handles_labels()
+        if handles:
+            fig.legend(
+                handles,
+                labels,
+                loc="upper center",
+                bbox_to_anchor=(0.5, 1.12),
+                ncol=len(handles),
+                frameon=False,
+            )
 
     out_path = output_dir / "sweep_combined.png"
     fig.savefig(out_path, dpi=300, bbox_inches="tight")

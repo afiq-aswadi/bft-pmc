@@ -79,7 +79,9 @@ def test_lr_aggregate_figure_entry_points(
         ],
     )
     lr_stitched.main()
-    assert len(saved_figures) == 10
+    # 10 aggregate figures plus the three intro-preview single-panel figures
+    # (sweep_ed_id_1x1 and the two dynamics ed_id_1x1 variants).
+    assert len(saved_figures) == 13
 
 
 def test_lr_plot_helpers_validate_series_and_scales() -> None:
@@ -411,3 +413,14 @@ def test_markov_aggregate_plot_edge_paths(
     )
     with pytest.raises(ValueError, match="cannot parse n_chains"):
         markov_dynamics.main()
+
+
+def test_intro_identifiability_figure_generator(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    import scripts.plot_intro_identifiability as intro
+
+    out_path = tmp_path / "intro_identifiability_spike_slab.png"
+    monkeypatch.setattr(sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(out_path)])
+    intro.main()
+    assert out_path.is_file()

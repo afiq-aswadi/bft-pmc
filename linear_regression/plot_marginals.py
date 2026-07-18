@@ -31,6 +31,7 @@ from plotting.marginal_cell import (
     legend_handles,
     ref_quantiles,
 )
+from plotting.paper_style import apply_paper_style
 
 
 def _figsize_for_D(D: int) -> tuple[float, float]:
@@ -64,7 +65,9 @@ def plot_prior_grid(
             "these fields, or pass --no-plot-dmmse to drop the memorising layer."
         )
 
-    fig, axes = plt.subplots(2, D, figsize=_figsize_for_D(D), constrained_layout=True)
+    figsize = _figsize_for_D(D)
+    apply_paper_style(figsize[0], 0.9)
+    fig, axes = plt.subplots(2, D, figsize=figsize, constrained_layout=True)
     axes = axes.reshape(2, D)
     axes[0, 0].set_ylabel("Density")
     axes[1, 0].set_ylabel("CDF")
@@ -99,7 +102,9 @@ def plot_prior_grid(
         _hide_spines(axes[0, d])
         _hide_spines(axes[1, d])
 
-    axes[0, 0].legend(handles=legend_handles(), frameon=False, fontsize="x-small")
+    fig.legend(
+        handles=legend_handles(), loc="outside upper center", ncol=3, frameon=False
+    )
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 
@@ -129,7 +134,9 @@ def plot_posterior_grid(
     means = data["baseline_generalising_posterior_means"][0]
     covs = data["baseline_generalising_posterior_covs"][0]
 
-    fig, axes = plt.subplots(2, D, figsize=_figsize_for_D(D), constrained_layout=True)
+    figsize = _figsize_for_D(D)
+    apply_paper_style(figsize[0], 0.9)
+    fig, axes = plt.subplots(2, D, figsize=figsize, constrained_layout=True)
     axes = axes.reshape(2, D)
     axes[0, 0].set_ylabel("Density")
     axes[1, 0].set_ylabel("CDF")
@@ -167,7 +174,12 @@ def plot_posterior_grid(
         _hide_spines(axes[0, d])
         _hide_spines(axes[1, d])
 
-    axes[0, 0].legend(handles=legend_handles(), frameon=False, fontsize="x-small")
+    fig.legend(
+        handles=legend_handles(posterior=True),
+        loc="outside upper center",
+        ncol=3,
+        frameon=False,
+    )
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 

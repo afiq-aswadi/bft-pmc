@@ -30,6 +30,7 @@ def _render_one(
     panel_size: float = 1.4,
     max_classes: int | None = None,
     dpi: int = 400,
+    print_frac: float = 0.95,
 ) -> None:
     out_dir.mkdir(parents=True, exist_ok=True)
     for mode in ("density", "cdf"):
@@ -44,6 +45,7 @@ def _render_one(
             prompt_tokens=prompt_tokens,
             max_classes=max_classes,
             dpi=dpi,
+            print_frac=print_frac,
         )
 
 
@@ -56,6 +58,7 @@ def _process_run(
     panel_size: float,
     max_classes: int | None,
     dpi: int = 400,
+    print_frac: float = 0.95,
 ) -> None:
     prior_path = samples_dir / f"M{n_chains}_prior.npz"
     id_path = samples_dir / f"M{n_chains}_in_distribution_L8.npz"
@@ -81,6 +84,7 @@ def _process_run(
             panel_size=panel_size,
             max_classes=max_classes,
             dpi=dpi,
+            print_frac=print_frac,
         )
 
     with np.load(id_path) as a:
@@ -97,6 +101,7 @@ def _process_run(
             panel_size=panel_size,
             max_classes=max_classes,
             dpi=dpi,
+            print_frac=print_frac,
         )
 
     with np.load(ood_path) as a:
@@ -113,6 +118,7 @@ def _process_run(
             panel_size=panel_size,
             max_classes=max_classes,
             dpi=dpi,
+            print_frac=print_frac,
         )
 
 
@@ -153,6 +159,13 @@ def main() -> None:
         help="Raster DPI for the saved PNGs. 200 keeps the full 10x10 grids ~4x "
         "smaller than 400 with no visible loss at print size.",
     )
+    parser.add_argument(
+        "--print-frac",
+        type=float,
+        default=0.95,
+        help="Fraction of the paper's text width the figure occupies in the "
+        "LaTeX source; used to scale fonts (0.45 for the K4 main figures).",
+    )
     args = parser.parse_args()
 
     if args.n_chains is None:
@@ -178,6 +191,7 @@ def main() -> None:
             panel_size=args.panel_size,
             max_classes=args.max_classes,
             dpi=args.dpi,
+            print_frac=args.print_frac,
         )
 
 

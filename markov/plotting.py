@@ -13,6 +13,8 @@ import torch
 from scipy.stats import gaussian_kde
 from scipy.stats import beta as beta_dist
 
+from plotting.paper_style import apply_paper_style
+
 
 MEMORISING_COLOR = "tab:green"
 GENERALISING_COLOR = "tab:blue"
@@ -25,6 +27,8 @@ OOD_LABEL = "OOD"
 TARGET_COLOR = "0.35"
 MEMORISING_LABEL = r"$\Pi_M$"
 GENERALISING_LABEL = r"$\Pi_\infty$"
+MEMORISING_LABEL_POSTERIOR = r"$\Pi^{\mathrm{mem}}(\cdot \mid c)$"
+GENERALISING_LABEL_POSTERIOR = r"$\Pi^{\mathrm{gen}}(\cdot \mid c)$"
 
 
 def _style_axis(
@@ -680,6 +684,7 @@ def plot_pmc_distribution_matrix(
     share_axes: bool = False,
     max_classes: int | None = None,
     dpi: int = 400,
+    print_frac: float = 0.95,
 ) -> None:
     """Plot PMC marginals as a full K x K matrix mirroring the transition matrix.
 
@@ -787,6 +792,8 @@ def plot_pmc_distribution_matrix(
             else:
                 cell["kde_values"] = None
             cell["ymax"] = ymax
+
+    apply_paper_style(panel_size * kd, print_frac)
 
     figure, axes = plt.subplots(
         kd,
@@ -911,18 +918,19 @@ def plot_pmc_distribution_matrix(
                 else:
                     ax.set_xticklabels([])
 
+    is_prior_figure = prompt_array.size == 0
+    mem_label = MEMORISING_LABEL if is_prior_figure else MEMORISING_LABEL_POSTERIOR
+    gen_label = GENERALISING_LABEL if is_prior_figure else GENERALISING_LABEL_POSTERIOR
     legend_handles = [
         plt.Line2D([0], [0], color=PMC_COLOR, lw=1.5, label="PMC"),
-        plt.Line2D([0], [0], color=MEMORISING_COLOR, lw=1.5, label=MEMORISING_LABEL),
-        plt.Line2D(
-            [0], [0], color=GENERALISING_COLOR, lw=1.5, label=GENERALISING_LABEL
-        ),
+        plt.Line2D([0], [0], color=MEMORISING_COLOR, lw=1.5, label=mem_label),
+        plt.Line2D([0], [0], color=GENERALISING_COLOR, lw=1.5, label=gen_label),
     ]
-    axes[0, 0].legend(
+    figure.legend(
         handles=legend_handles,
-        loc="best",
+        loc="outside upper center",
+        ncol=len(legend_handles),
         frameon=False,
-        fontsize="small",
     )
 
     save_path = Path(save_path)

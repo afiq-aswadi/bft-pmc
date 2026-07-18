@@ -18,20 +18,22 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from plotting.paper_style import apply_paper_style
+
 
 SERIES = [
-    (r"$\Pi_M$", "o-", "tab:green", 5),
-    (r"$\Pi_\infty$", "s-", "tab:blue", 5),
+    ("Memorizing", "o-", "tab:green", 5),
+    ("Generalizing", "s-", "tab:blue", 5),
 ]
 
 
 def _style_ax(ax: plt.Axes, ylabel: str | None = None) -> None:
     ax.set_xscale("log", base=2)
     ax.set_yscale("log")
-    ax.set_xlabel(r"$M$", fontsize=16)
+    ax.set_xlabel(r"$M$")
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=16)
-    ax.tick_params(axis="both", which="major", labelsize=13)
+        ax.set_ylabel(ylabel)
+    ax.tick_params(axis="both", which="major")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(True, alpha=0.3, linestyle="--")
@@ -80,6 +82,8 @@ def main() -> None:
         kl = kl[kl["n_chains"].isin(common_m)].sort_values("n_chains")
 
     num_columns = 3 if kl is not None else 2
+    apply_paper_style(6 * num_columns, 0.95)
+
     fig, axes = plt.subplots(
         1,
         num_columns,
@@ -112,8 +116,16 @@ def main() -> None:
     _style_ax(axes[offset], "Energy distance")
     _style_ax(axes[offset + 1], "Sliced Wasserstein")
 
-    if axes[0].get_legend_handles_labels()[0]:
-        axes[-1].legend(loc="upper right", frameon=False, fontsize=14)
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.16),
+            ncol=len(handles),
+            frameon=False,
+        )
 
     args.out_path.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(args.out_path, dpi=300, bbox_inches="tight")

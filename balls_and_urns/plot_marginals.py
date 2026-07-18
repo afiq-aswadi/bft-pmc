@@ -32,6 +32,7 @@ from plotting.marginal_cell import (
     legend_handles,
     ref_quantiles,
 )
+from plotting.paper_style import apply_paper_style
 
 PUB_DPI = 400
 
@@ -73,7 +74,9 @@ def plot_grid(
     V = min(num_dims, V_full) if num_dims else V_full
     mem_weights = pool_weights[prompt_idx]
 
-    fig, axes = plt.subplots(2, V, figsize=_figsize_for_V(V), constrained_layout=True)
+    figsize = _figsize_for_V(V)
+    apply_paper_style(figsize[0], 0.9)
+    fig, axes = plt.subplots(2, V, figsize=figsize, constrained_layout=True)
     axes = axes.reshape(2, V)
 
     for k in range(V):
@@ -116,8 +119,11 @@ def plot_grid(
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
 
-    axes[0, 0].legend(
-        handles=legend_handles(), frameon=False, fontsize="small", loc="best"
+    fig.legend(
+        handles=legend_handles(posterior=(prompt_source != "prior")),
+        loc="outside upper center",
+        ncol=3,
+        frameon=False,
     )
     _save_publication(fig, output_path)
     plt.close(fig)

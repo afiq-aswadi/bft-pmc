@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from pathlib import Path
+from typing import NoReturn
 
 import numpy as np
 import pytest
@@ -267,3 +268,71 @@ def test_beta_bernoulli_main_trains_or_loads_checkpoint(
         train_config.output_dir / "beta_bernoulli_pmc_grid",
         load_config.output_dir / "beta_bernoulli_pmc_grid",
     ]
+
+
+def test_beta_bernoulli_load_pmc_results_both_schemas(tmp_path: Path) -> None:
+    config = _config(tmp_path)
+    results = _results(config)
+
+    native = tmp_path / "native.npz"
+    np.savez_compressed(
+        native,
+        theta_stars=results.theta_stars,
+        prompts=results.prompts,
+        prior_samples=results.prior_samples,
+        posterior_samples=results.posterior_samples,
+        posterior_alpha=results.posterior_alpha,
+        posterior_beta=results.posterior_beta,
+    )
+    loaded_native = beta_bernoulli.load_pmc_results(native)
+    np.testing.assert_array_equal(
+        loaded_native.posterior_samples, results.posterior_samples
+    )
+
+    legacy = tmp_path / "legacy.npz"
+    np.savez_compressed(
+        legacy,
+        grid_theta_stars=results.theta_stars,
+        grid_prompts=results.prompts,
+        grid_prior_theta_samples=results.prior_samples,
+        grid_theta_samples_post=results.posterior_samples,
+        grid_alpha_post=results.posterior_alpha,
+        grid_beta_post=results.posterior_beta,
+    )
+    loaded_legacy = beta_bernoulli.load_pmc_results(legacy)
+    np.testing.assert_array_equal(
+        loaded_legacy.posterior_samples, results.posterior_samples
+    )
+    np.testing.assert_array_equal(loaded_legacy.posterior_alpha, results.posterior_alpha)
+
+
+def test_beta_bernoulli_main_replot_from_skips_training(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    config = _config(tmp_path)
+    samples = tmp_path / "samples.npz"
+    results = _results(config)
+    np.savez_compressed(
+        samples,
+        theta_stars=results.theta_stars,
+        prompts=results.prompts,
+        prior_samples=results.prior_samples,
+        posterior_samples=results.posterior_samples,
+        posterior_alpha=results.posterior_alpha,
+        posterior_beta=results.posterior_beta,
+    )
+
+    def _fail_train(_config: beta_bernoulli.BetaBernoulliConfig) -> NoReturn:
+        raise AssertionError("training must not run in --replot-from mode")
+
+    plot_calls: list[Path] = []
+    monkeypatch.setattr(beta_bernoulli, "train_beta_bernoulli", _fail_train)
+    monkeypatch.setattr(
+        beta_bernoulli,
+        "plot_pmc_grid",
+        lambda results, config, output_stem: plot_calls.append(output_stem),
+    )
+
+    replot_config = replace(config, replot_from=samples)
+    beta_bernoulli.main(replot_config)
+    assert plot_calls == [config.output_dir / "beta_bernoulli_pmc_grid"]

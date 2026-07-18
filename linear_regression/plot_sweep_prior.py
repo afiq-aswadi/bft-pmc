@@ -18,10 +18,12 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from plotting.paper_style import apply_paper_style
+
 
 SERIES = [
-    (r"$\Pi_M$", "o-", "tab:green", 5),
-    (r"$\Pi_\infty$", "s-", "tab:blue", 5),
+    ("Memorizing", "o-", "tab:green", 5),
+    ("Generalizing", "s-", "tab:blue", 5),
 ]
 
 
@@ -35,10 +37,10 @@ def _style_ax(
         ax.set_yscale("symlog", linthresh=symlog_thresh)
     else:
         ax.set_yscale("log")
-    ax.set_xlabel(r"$M$", fontsize=16)
+    ax.set_xlabel(r"$M$")
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=16)
-    ax.tick_params(axis="both", which="major", labelsize=13)
+        ax.set_ylabel(ylabel)
+    ax.tick_params(axis="both", which="major")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(True, alpha=0.3, linestyle="--")
@@ -83,6 +85,8 @@ def main() -> None:
     prior_df = prior_df[prior_df["num_tasks"].isin(common_M)].sort_values("num_tasks")
     delta_df = delta_df[delta_df["num_tasks"].isin(common_M)].sort_values("num_tasks")
 
+    apply_paper_style(18, 0.95)
+
     fig, axes = plt.subplots(1, 3, figsize=(18, 4), constrained_layout=True)
 
     _plot_panel(
@@ -115,8 +119,16 @@ def main() -> None:
     _style_ax(axes[1], "Energy distance", symlog_thresh=ed_thresh)
     _style_ax(axes[2], "Sliced Wasserstein", symlog_thresh=sw_thresh)
 
-    if axes[0].get_legend_handles_labels()[0]:
-        axes[-1].legend(loc="upper right", frameon=False, fontsize=14)
+    handles, labels = axes[0].get_legend_handles_labels()
+    if handles:
+        fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1.16),
+            ncol=len(handles),
+            frameon=False,
+        )
 
     out_path = args.out_path or args.metrics_csv.parent / "sweep_prior_delta_ed_sw.png"
     out_path.parent.mkdir(parents=True, exist_ok=True)

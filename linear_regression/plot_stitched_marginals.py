@@ -26,6 +26,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import numpy as np
 import tyro
+from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 from scipy.stats import norm
 
 from plotting.marginal_cell import (
@@ -36,6 +37,7 @@ from plotting.marginal_cell import (
     legend_handles,
     ref_quantiles,
 )
+from plotting.paper_style import apply_paper_style
 
 
 def _pick(data: dict, key: str, dim: int, is_prior: bool) -> np.ndarray:
@@ -92,12 +94,15 @@ def plot_stitched(
     D = first["pt"].shape[1] if is_prior else first["pt"].shape[2]
     n_T = len(entries)
 
+    apply_paper_style(1.5 * D, 0.95)
+
     fig, axes = plt.subplots(
         n_T,
         D,
         figsize=(1.5 * D, 1.0 * n_T),
         constrained_layout=True,
     )
+    fig.get_layout_engine().set(w_pad=0.06, h_pad=0.06)
     axes = np.atleast_2d(axes)
     if n_T == 1:
         axes = axes.reshape(1, -1)
@@ -137,14 +142,31 @@ def plot_stitched(
                 )
 
             if d == 0:
-                ax.set_ylabel(f"$M={M}$", fontsize="small")
+                ax.set_ylabel(
+                    f"$M={M}$",
+                    fontsize="x-small",
+                    rotation=0,
+                    ha="right",
+                    va="center",
+                    labelpad=14,
+                )
             if row == 0:
-                ax.set_title(f"dim {d}", fontsize="small")
+                ax.set_title(f"dim {d}", fontsize="x-small")
             ax.tick_params(labelsize="xx-small")
+            ax.xaxis.set_major_locator(MaxNLocator(2))
+            ax.yaxis.set_major_locator(MaxNLocator(2))
+            ax.xaxis.set_major_formatter(FormatStrFormatter("%g"))
+            ax.yaxis.set_major_formatter(FormatStrFormatter("%g"))
             ax.spines["top"].set_visible(False)
             ax.spines["right"].set_visible(False)
 
-    axes[0, 0].legend(handles=legend_handles(), frameon=False, fontsize="xx-small")
+    fig.legend(
+        handles=legend_handles(posterior=not is_prior),
+        loc="outside upper center",
+        ncol=3,
+        frameon=False,
+        fontsize="x-small",
+    )
     fig.savefig(output_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
 

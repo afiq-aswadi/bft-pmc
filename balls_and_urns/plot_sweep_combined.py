@@ -11,6 +11,8 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tyro
 
+from plotting.paper_style import apply_paper_style
+
 
 @dataclass
 class PlotConfig:
@@ -23,8 +25,8 @@ SERIES = [
     ("Generalizing", "o-", "tab:blue", 5),
 ]
 SERIES_PRIOR = [
-    (r"$\Pi_M$", "s-", "tab:green", 5),
-    (r"$\Pi_\infty$", "o-", "tab:blue", 5),
+    ("Memorizing", "s-", "tab:green", 5),
+    ("Generalizing", "o-", "tab:blue", 5),
 ]
 
 
@@ -39,19 +41,26 @@ def style_ax(
         ax.set_yscale("symlog", linthresh=symlog_thresh)
     elif log_scale:
         ax.set_yscale("log")
-    ax.set_xlabel(r"$M$", fontsize=16)
+    ax.set_xlabel(r"$M$")
     if ylabel:
-        ax.set_ylabel(ylabel, fontsize=16)
-    ax.tick_params(axis="both", which="major", labelsize=13)
+        ax.set_ylabel(ylabel)
+    ax.tick_params(axis="both", which="major")
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.grid(True, alpha=0.3, linestyle="--")
 
 
-def _add_inset_legend(target_ax: plt.Axes, source_ax: plt.Axes) -> None:
-    handles, labels = source_ax.get_legend_handles_labels()
+def _add_shared_legend(fig: plt.Figure, ax: plt.Axes, anchor_y: float = 1.06) -> None:
+    handles, labels = ax.get_legend_handles_labels()
     if handles:
-        target_ax.legend(handles, labels, loc="upper right", frameon=False, fontsize=14)
+        fig.legend(
+            handles,
+            labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, anchor_y),
+            ncol=len(handles),
+            frameon=False,
+        )
 
 
 def plot_series(
@@ -97,15 +106,16 @@ def main(config: PlotConfig) -> None:
         # 2x2 (Sym KL, ED) drops SW for the paper-ready version.
         for layout, suffix in [("2x3", ""), ("2x2", "_2x2")]:
             n_cols = 3 if layout == "2x3" else 2
+            apply_paper_style(4.2 * n_cols, 0.49 if n_cols == 2 else 0.95)
             fig, axes = plt.subplots(
                 2,
                 n_cols,
-                figsize=(6 * n_cols, 8),
+                figsize=(4.2 * n_cols, 6.2),
                 constrained_layout=True,
                 sharey="col",
             )
             row_labels = ["In-distribution", "Out-of-distribution"]
-            ylabels = ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"][
+            ylabels = ["Symmetrized KL", "Energy distance", "Sliced Wasserstein"][
                 :n_cols
             ]
 
@@ -168,21 +178,22 @@ def main(config: PlotConfig) -> None:
             for row_idx, row_label in enumerate(row_labels):
                 axes[row_idx, 0].annotate(
                     row_label,
-                    xy=(-0.28, 0.5),
+                    xy=(-0.55, 0.5),
                     xycoords="axes fraction",
                     ha="center",
                     va="center",
-                    fontsize=16,
+                    fontsize=plt.rcParams["axes.labelsize"],
                     rotation=90,
                 )
 
-            _add_inset_legend(axes[0, -1], axes[0, 0])
+            _add_shared_legend(fig, axes[0, 0])
 
             out_path = output_dir / f"sweep_posterior{suffix}.png"
             fig.savefig(out_path, dpi=300, bbox_inches="tight")
             plt.close(fig)
 
     if not prior_df.empty:
+        apply_paper_style(12, 0.95)
         fig, axes = plt.subplots(1, 2, figsize=(12, 4), constrained_layout=True)
         plot_series(
             axes[0],
@@ -211,7 +222,7 @@ def main(config: PlotConfig) -> None:
         ):
             style_ax(axes[col_idx], ylabel, symlog_thresh=thresh)
 
-        _add_inset_legend(axes[-1], axes[0])
+        _add_shared_legend(fig, axes[0], anchor_y=1.08)
 
         out_path = output_dir / "sweep_prior.png"
         fig.savefig(out_path, dpi=300, bbox_inches="tight")
