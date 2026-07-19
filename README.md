@@ -213,3 +213,7 @@ written to `coverage.xml`.
 
 The repository, including the vendored `pfn_transformers/` snapshot, is
 released under the MIT License. See [`LICENSE`](LICENSE).
+
+## Supplementary figures
+
+`icl2_supplementary.pdf` collects the complete set of PMC-recovered marginal densities and CDFs for all three task families across every task diversity. The paper shows a representative subset; the full set lives here to keep the arXiv submission compilable.
