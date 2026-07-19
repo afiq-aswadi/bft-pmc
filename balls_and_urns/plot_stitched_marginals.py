@@ -45,7 +45,10 @@ SOURCE_LABELS = {
     "data_generalising": "Generalizing prompt",
     "data_memorising": "Memorizing prompt",
 }
-PUB_DPI = 400
+# 200 dpi keeps the large multi-panel stitched grids under arXiv's 34 MP
+# per-image limit while remaining well above print resolution once the figure
+# is scaled to page width.
+PUB_DPI = 200
 
 
 def _save_publication(fig, out_path: Path) -> None:
