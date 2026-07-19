@@ -85,6 +85,8 @@ class BetaBernoulliConfig:
     # Path to a previously saved pmc_samples.npz; when set, skip training and
     # rollouts and regenerate the paper figure from the stored samples.
     replot_from: Path | None = None
+    # Grid panel (0-8) lifted to stand alone as main-text Figure 1b.
+    main_figure_index: int = 1
 
     def validate(self) -> None:
         positive_integers = (
@@ -273,6 +275,46 @@ def compute_pmc_results(
     )
 
 
+# PMC is goldenrod throughout the paper; the analytic references are grey
+# (prior) and blue (posterior). Keep these consistent with the marginal plots.
+_PMC_POST_COLOR = "goldenrod"
+_ANALYTIC_POST_COLOR = "tab:blue"
+_PRIOR_COLOR = "grey"
+
+
+def _draw_bb_panel(
+    ax,
+    *,
+    prior_samples: np.ndarray,
+    posterior_samples: np.ndarray,
+    alpha_post: float,
+    beta_post: float,
+    config: BetaBernoulliConfig,
+    x: np.ndarray,
+    bins: np.ndarray,
+) -> None:
+    """Draw one Beta-Bernoulli PMC-vs-analytic panel (prior and posterior)."""
+    ax.hist(
+        prior_samples, bins=bins, density=True,
+        color=_PRIOR_COLOR, alpha=0.25, label="PMC prior",
+    )
+    ax.plot(
+        x, beta_distribution.pdf(x, config.prior_alpha, config.prior_beta),
+        color=_PRIOR_COLOR, linestyle="--", linewidth=1.5, label="Beta prior",
+    )
+    ax.hist(
+        posterior_samples, bins=bins, density=True,
+        color=_PMC_POST_COLOR, alpha=0.45, label="PMC posterior",
+    )
+    ax.plot(
+        x, beta_distribution.pdf(x, alpha_post, beta_post),
+        color=_ANALYTIC_POST_COLOR, linewidth=1.5, label="Beta posterior",
+    )
+    ax.set_xlim(0.0, 1.0)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+
+
 def plot_pmc_grid(
     results: PMCResults, config: BetaBernoulliConfig, output_stem: Path
 ) -> None:
@@ -283,7 +325,6 @@ def plot_pmc_grid(
 
     x = np.linspace(1e-4, 1.0 - 1e-4, 500)
     bins = np.linspace(0.0, 1.0, 61)
-    colors = plt.get_cmap("viridis")
     apply_paper_style(9, 1.0)
     fig, axes = plt.subplots(
         3,
@@ -296,48 +337,18 @@ def plot_pmc_grid(
     for index, ax in enumerate(axes.flat):
         num_ones = int(results.prompts[index].sum())
         num_zeros = config.prompt_len - num_ones
-        ax.hist(
-            results.prior_samples,
-            bins=bins,
-            density=True,
-            color="grey",
-            alpha=0.25,
-            label="PMC prior",
+        _draw_bb_panel(
+            ax,
+            prior_samples=results.prior_samples,
+            posterior_samples=results.posterior_samples[index],
+            alpha_post=results.posterior_alpha[index],
+            beta_post=results.posterior_beta[index],
+            config=config, x=x, bins=bins,
         )
-        ax.plot(
-            x,
-            beta_distribution.pdf(x, config.prior_alpha, config.prior_beta),
-            color="grey",
-            linestyle="--",
-            linewidth=1.5,
-            label="Beta prior",
-        )
-        ax.hist(
-            results.posterior_samples[index],
-            bins=bins,
-            density=True,
-            color=colors(0.65),
-            alpha=0.35,
-            label="PMC posterior",
-        )
-        ax.plot(
-            x,
-            beta_distribution.pdf(
-                x,
-                results.posterior_alpha[index],
-                results.posterior_beta[index],
-            ),
-            color=colors(0.2),
-            linewidth=1.5,
-            label="Beta posterior",
-        )
-        ax.set_xlim(0.0, 1.0)
         ax.set_title(
             rf"$\theta^\star={results.theta_stars[index]:.1f}$: "
             f"{num_ones} ones, {num_zeros} zeros",
         )
-        ax.spines["top"].set_visible(False)
-        ax.spines["right"].set_visible(False)
 
     for ax in axes[:, 0]:
         ax.set_ylabel("Density")
@@ -358,6 +369,40 @@ def plot_pmc_grid(
         dpi=config.plot_dpi,
         bbox_inches="tight",
     )
+    fig.savefig(output_stem.with_suffix(".pdf"), bbox_inches="tight")
+    plt.close(fig)
+
+
+def plot_pmc_single(
+    results: PMCResults,
+    config: BetaBernoulliConfig,
+    output_stem: Path,
+    *,
+    index: int,
+) -> None:
+    """Save one panel of the grid on its own axes (main-text Figure 1b).
+
+    Figure 1b is a single panel lifted from the nine-panel grid: it uses the
+    same PMC prior and the grid's ``index``-th prompt-conditioned posterior,
+    drawn on standalone axes with a legend.
+    """
+    x = np.linspace(1e-4, 1.0 - 1e-4, 500)
+    bins = np.linspace(0.0, 1.0, 61)
+    apply_paper_style(5, 0.42)
+    fig, ax = plt.subplots(figsize=(5, 3.5), dpi=config.plot_dpi, constrained_layout=True)
+    _draw_bb_panel(
+        ax,
+        prior_samples=results.prior_samples,
+        posterior_samples=results.posterior_samples[index],
+        alpha_post=results.posterior_alpha[index],
+        beta_post=results.posterior_beta[index],
+        config=config, x=x, bins=bins,
+    )
+    ax.set_xlabel(r"$\theta$")
+    ax.set_ylabel("Density")
+    ax.legend(frameon=False)
+    output_stem.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(output_stem.with_suffix(".png"), dpi=config.plot_dpi, bbox_inches="tight")
     fig.savefig(output_stem.with_suffix(".pdf"), bbox_inches="tight")
     plt.close(fig)
 
@@ -403,6 +448,12 @@ def main(config: BetaBernoulliConfig) -> None:
             config,
             config.output_dir / "beta_bernoulli_pmc_grid",
         )
+        plot_pmc_single(
+            results,
+            config,
+            config.output_dir / "beta_bernoulli_main_figure",
+            index=config.main_figure_index,
+        )
         return
 
     if config.checkpoint_path is None:
@@ -425,6 +476,12 @@ def main(config: BetaBernoulliConfig) -> None:
         results,
         config,
         config.output_dir / "beta_bernoulli_pmc_grid",
+    )
+    plot_pmc_single(
+        results,
+        config,
+        config.output_dir / "beta_bernoulli_main_figure",
+        index=config.main_figure_index,
     )
 
 

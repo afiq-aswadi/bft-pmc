@@ -805,8 +805,8 @@ def plot_pmc_distribution_matrix(
     )
     if kd == 1:
         axes = np.asarray(axes).reshape(1, 1)
-    if title_prefix:
-        figure.suptitle(title_prefix, fontsize="medium")
+    # No suptitle: the figure-level legend sits at the top, and the paper
+    # caption identifies the prompt source and task diversity.
 
     for src in range(kd):
         for dst in range(kd):
