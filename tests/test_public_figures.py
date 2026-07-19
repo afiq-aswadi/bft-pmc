@@ -79,9 +79,9 @@ def test_lr_aggregate_figure_entry_points(
         ],
     )
     lr_stitched.main()
-    # 10 aggregate figures plus the three intro-preview single-panel figures
-    # (sweep_ed_id_1x1 and the two dynamics ed_id_1x1 variants).
-    assert len(saved_figures) == 13
+    # 10 aggregate figures (the combined 2x2/2x3 sweep and dynamics grids and
+    # the prior-space panels); no intro-preview single-panel figures.
+    assert len(saved_figures) == 10
 
 
 def test_lr_plot_helpers_validate_series_and_scales() -> None:

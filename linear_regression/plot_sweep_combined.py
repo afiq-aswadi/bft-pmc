@@ -202,20 +202,6 @@ def main(config: PlotConfig) -> None:
             fig.savefig(out_path, dpi=300, bbox_inches="tight")
             plt.close(fig)
 
-        # single-panel ED (in-distribution) for the intro preview figure
-        apply_paper_style(5.5, 0.44)
-        fig, ax = plt.subplots(figsize=(5.5, 4), constrained_layout=True)
-        plot_series(
-            ax,
-            indist_df["num_tasks"],
-            ["dist/ed_vs_baseline_memorising", "dist/ed_vs_baseline_generalising"],
-            indist_df,
-        )
-        style_ax(ax, "Energy distance")
-        ax.legend(frameon=False)
-        out_path = output_dir / "sweep_ed_id_1x1.png"
-        fig.savefig(out_path, dpi=300, bbox_inches="tight")
-        plt.close(fig)
         return
     else:
         # prior mode: 1 row x 2 cols (ED, SW) -- no prediction metrics

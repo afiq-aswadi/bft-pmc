@@ -179,24 +179,6 @@ def _plot_dynamics(df: pd.DataFrame, out_path: Path, log_xscale: bool = False) -
             fig.savefig(layout_path, dpi=300, bbox_inches="tight")
             plt.close(fig)
 
-        # single-panel ED (in-distribution) for the intro preview figure
-        apply_paper_style(5.5, 0.44)
-        fig, ax = plt.subplots(figsize=(5.5, 4), constrained_layout=True)
-        plot_series(
-            ax,
-            df["step"],
-            [
-                "ed_vs_baseline_memorising_from_prompts_memorising",
-                "ed_vs_baseline_generalising_from_prompts_memorising",
-            ],
-            df,
-            SERIES,
-        )
-        style_ax(ax, "Energy distance", log_xscale=log_xscale)
-        ax.legend(frameon=False)
-        panel_path = out_path.with_name(out_path.stem + "_ed_id_1x1" + out_path.suffix)
-        fig.savefig(panel_path, dpi=300, bbox_inches="tight")
-        plt.close(fig)
         return
     else:
         # prior mode: 1 row x 2 cols (ED, SW)
