@@ -69,10 +69,12 @@ class TrainConfig:
     learning_rate: float = 1e-3
     warmup_steps: int = 500
 
-    # checkpointing
+    # checkpointing: one checkpoint every 500 steps. Switch to "logarithmic"
+    # to get the paper's dense-early schedule (linear_checkpoint_interval union
+    # n_log_checkpoints log-spaced steps) instead.
     save_checkpoint: bool = True
-    checkpoint_schedule: str = "logarithmic"
-    save_every: int = 1000
+    checkpoint_schedule: str = "linear"
+    save_every: int = 500
     linear_checkpoint_interval: int = 500
     n_log_checkpoints: int = 200
     checkpoint_root: str = "checkpoints/bau"

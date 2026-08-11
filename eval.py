@@ -14,6 +14,7 @@ TARGETS = {
     "markov-sweep": ROOT / "markov" / "sweep_analysis.py",
     "markov-threshold": ROOT / "markov" / "task_diversity_threshold.py",
     "path-stability": ROOT / "analysis" / "path_stability.py",
+    "compare-pos-encodings": ROOT / "analysis" / "pos_encoding_comparison.py",
     "plot-lr-sweep": ROOT / "linear_regression" / "plot_sweep_combined.py",
     "plot-lr-dynamics": ROOT / "linear_regression" / "plot_dynamics_combined.py",
     "plot-bau-sweep": ROOT / "balls_and_urns" / "plot_sweep_combined.py",
@@ -33,6 +34,7 @@ Commands:
   markov-sweep      Evaluate the Markov sweep from saved checkpoints.
   markov-threshold  Run the Markov task-diversity threshold experiment.
   path-stability    Scaled-L1 rollout convergence diagnostic (jellyfish plot).
+  compare-pos-encodings  Compare the learned/rope/none positional encodings.
   plot-lr-sweep     Regenerate the linear-regression sweep figure from metrics.csv.
   plot-lr-dynamics  Regenerate the linear-regression dynamics figure from metrics.csv.
   plot-bau-sweep    Regenerate the balls-and-urns sweep figure from metrics.csv.

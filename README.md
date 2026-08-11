@@ -94,10 +94,13 @@ together with `scripts/reproduce_paper.sh` when regenerating figures.
 The unified training entry point dispatches to each task family:
 
 ```bash
-uv run train.py lr --num-tasks 32 --num-steps 10 --batch-size 8 --seq-len 16 --n-ctx 32 --no-use-wandb
-uv run train.py bau --num-tasks 32 --num-steps 10 --batch-size 8 --seq-len 16 --no-use-wandb
+uv run train.py lr --num-tasks 32 --num-steps 10 --batch-size 8 --seq-len 16 --n-ctx 32 --save-every 5 --no-use-wandb
+uv run train.py bau --num-tasks 32 --num-steps 10 --batch-size 8 --seq-len 16 --save-every 5 --no-use-wandb
 uv run train.py markov --config-path markov/train.yaml --n-chains 32 --max-steps 10 --no-use-wandb
 ```
+
+LR and BAU checkpoint every `--save-every` steps (500 by default), so short smoke
+runs need a smaller interval or they finish without writing one.
 
 ### Positional encodings
 

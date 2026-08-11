@@ -18,9 +18,8 @@ commands:
   --learning-rate 5e-4
   --warmup-steps 0
   --save-checkpoint
-  --checkpoint-schedule logarithmic
-  --linear-checkpoint-interval 500
-  --n-log-checkpoints 200
+  --checkpoint-schedule linear
+  --save-every 500
   --pos-encoding ~POS_ENC~
   --checkpoint-root checkpoints/bau/task_diversity_~POS_ENC~
   --use-wandb
