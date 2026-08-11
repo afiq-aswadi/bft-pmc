@@ -38,8 +38,9 @@ class DatasetConfig:
     output_dir: Path
     checkpoint_root: Path
     alpha_value: float = 1.0
-    seq_len: int = 16
-    batch_size: int = 256
+    # one row per prompt: 128 prompts of 32 observed tokens each
+    seq_len: int = 32
+    batch_size: int = 128
     seed: int = 42
     overwrite: bool = False
 

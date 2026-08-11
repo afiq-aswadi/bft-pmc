@@ -169,7 +169,7 @@ def compute_distribution_metrics_single(
     x_dist = torch.distributions.Normal(0.0, 1.0)
 
     if prompt_length == 0:
-        pt_samples = predictive_monte_carlo_beta_chunked(
+        pt_samples, rollout_xs, rollout_ys = predictive_monte_carlo_beta_chunked(
             model=model,
             x_distribution=x_dist,
             forward_recursion_steps=predictive_steps,
@@ -177,8 +177,8 @@ def compute_distribution_metrics_single(
             chunk_size=100,
             init_x=None,
             init_y=None,
+            save_rollouts=True,
         )
-        assert isinstance(pt_samples, np.ndarray)
         discrete_indices = np.random.randint(0, prior.num_tasks, size=n_samples_prior)
         theta_pool = prior.tasks.cpu().numpy()
         dmmse_samples = theta_pool[discrete_indices]
@@ -210,6 +210,9 @@ def compute_distribution_metrics_single(
                 prior.num_tasks, 1.0 / prior.num_tasks, dtype=np.float64
             ),
             "is_prior": np.array(True),
+            # the generated (x, y) pairs each pt estimate was solved from
+            "rollout_x": rollout_xs.astype(np.float32),
+            "rollout_y": rollout_ys.astype(np.float32),
         }
         return metrics, samples, [metrics]
 
@@ -222,7 +225,7 @@ def compute_distribution_metrics_single(
         all_xs_device = all_xs.to(model_device)
         all_ys_device = all_ys.to(model_device)
 
-        pt_samples = predictive_monte_carlo_beta_chunked(
+        pt_samples, rollout_xs, rollout_ys = predictive_monte_carlo_beta_chunked(
             model=model,
             x_distribution=x_dist,
             forward_recursion_steps=predictive_steps,
@@ -230,8 +233,8 @@ def compute_distribution_metrics_single(
             chunk_size=100,
             init_x=all_xs_device,
             init_y=all_ys_device,
+            save_rollouts=True,
         )
-        assert isinstance(pt_samples, np.ndarray)
 
         metrics_list: list[dict[str, float]] = []
         all_memorising = []
@@ -302,6 +305,9 @@ def compute_distribution_metrics_single(
             "prompt_xs": all_xs.cpu().numpy().astype(np.float32),
             "prompt_ys": all_ys.cpu().numpy().astype(np.float32),
             "is_prior": np.array(False),
+            # prompt + generated (x, y) pairs behind each posterior pt estimate
+            "rollout_x": rollout_xs.astype(np.float32),
+            "rollout_y": rollout_ys.astype(np.float32),
         }
         return metrics, samples, metrics_list
 
@@ -314,13 +320,15 @@ def compute_distribution_metrics_single(
     all_generalising_covs = []
     all_prompt_xs = []
     all_prompt_ys = []
+    all_rollout_xs = []
+    all_rollout_ys = []
     for _ in range(n_prompts):
         context_xs, context_ys = sample_prompt(
             prior, prompt_source, prompt_length, noise_std
         )
         context_xs_device = context_xs.to(model_device)
         context_ys_device = context_ys.to(model_device)
-        pt_samples = predictive_monte_carlo_beta_chunked(
+        pt_samples, rollout_xs, rollout_ys = predictive_monte_carlo_beta_chunked(
             model=model,
             x_distribution=x_dist,
             forward_recursion_steps=predictive_steps,
@@ -328,8 +336,10 @@ def compute_distribution_metrics_single(
             chunk_size=100,
             init_x=context_xs_device,
             init_y=context_ys_device,
+            save_rollouts=True,
         )
-        assert isinstance(pt_samples, np.ndarray)
+        all_rollout_xs.append(rollout_xs)
+        all_rollout_ys.append(rollout_ys)
         memorising_samples = sample_dmmse_posterior(
             context_xs, context_ys, prior, noise_variance, n_samples
         )
@@ -385,6 +395,8 @@ def compute_distribution_metrics_single(
         "prompt_xs": np.stack(all_prompt_xs, axis=0).astype(np.float32),
         "prompt_ys": np.stack(all_prompt_ys, axis=0).astype(np.float32),
         "is_prior": np.array(False),
+        "rollout_x": np.stack(all_rollout_xs, axis=0).astype(np.float32),
+        "rollout_y": np.stack(all_rollout_ys, axis=0).astype(np.float32),
     }
     return metrics, samples, metrics_list
 

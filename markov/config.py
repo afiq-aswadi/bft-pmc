@@ -12,7 +12,8 @@ class MarkovConfig:
 
     # task
     k: int = 10
-    seq_len: int = 512
+    # 256 positions = BOS + 255 states, matching the LR and BAU models.
+    seq_len: int = 256
     n_chains: int = 128
 
     # optimization
@@ -29,7 +30,7 @@ class MarkovConfig:
     rope_theta: float = 10000.0
 
     # evaluation
-    context_len: int = 400
+    context_len: int = 200
     num_eval_trials: int = 30
     # baseline-delta eval uses a separate (smaller) batch because bi_ret scales
     # its einsum with n_chains and can OOM at training batch_size when n_chains

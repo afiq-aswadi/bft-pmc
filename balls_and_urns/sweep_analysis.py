@@ -35,13 +35,16 @@ class SweepConfig:
     compute_prior_mode: bool = True
     prior_only_distribution: bool = False
     n_samples: int = 100
-    n_samples_prior: int = 1000
+    n_samples_prior: int = 1024
     n_projections: int = 100
-    predictive_steps: int = 256
+    predictive_steps: int = 223
     chunk_size: int = 100
     alpha_value: float = 1.0
     output_dir: str = "outputs/bau/sweep_analysis"
     device: str | None = None
+    # Rollout token streams are written to <bundle>_rollouts.npz alongside each
+    # sample bundle; disable when only the theta estimates are needed.
+    save_rollouts: bool = True
 
     def validate(self) -> None:
         if not self.eval_dataset_dir:
@@ -155,6 +158,7 @@ def run_analysis(config: SweepConfig, output_dir: Path) -> pd.DataFrame:
                 samples_save_path=samples_dir / f"{run_dir.name}__source_{source}.npz",
                 step=checkpoint_step,
                 prompt_source=source,
+                save_rollouts=config.save_rollouts,
             )
             results.append({**base_row, "prompt_source": source, **source_metrics})
 

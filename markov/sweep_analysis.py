@@ -16,7 +16,7 @@ used in the LR code.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import cast
 
@@ -25,6 +25,7 @@ import pandas as pd
 import torch
 import tyro
 
+from analysis.rollouts import compact_token_array, rollout_bundle_path, save_rollout_bundle
 from markov.analysis_common import load_markov_state_dict, load_trained_markov_artifacts
 from markov.plotting import (
     plot_distribution_distance_dynamics,
@@ -66,17 +67,24 @@ class SweepConfig:
     device: str | None = None
     allow_seed_rehydration: bool = False
 
-    n_samples: int = 128
-    n_prompts: int = 16
-    prompt_len: int = 8
-    generation_length: int = 400
+    n_samples: int = 100
+    n_samples_prior: int = 1024
+    n_prompts: int = 128
+    prompt_len: int = 32
+    generation_length: int = 223
     n_projections: int = 100
     chunk_size: int = 64
     seed: int = 0
+    # Rollout state sequences go to <bundle>_rollouts.npz next to each sample
+    # bundle; one bundle is written per checkpoint, so this is the bulk of the
+    # analysis output.
+    save_rollouts: bool = True
 
     def validate(self) -> None:
         if self.n_samples < 1:
             raise ValueError("n_samples must be positive.")
+        if self.n_samples_prior < 1:
+            raise ValueError("n_samples_prior must be positive.")
         if self.n_prompts < 0:
             raise ValueError("n_prompts must be non-negative.")
         if self.prompt_len < 0:
@@ -432,8 +440,13 @@ def _save_predictive_samples(
     step: int,
     prompt_source: str,
     n_chains: int,
+    rollouts: np.ndarray | None = None,
+    save_rollouts: bool = True,
 ) -> None:
-    """Save a bundled predictive-sampling artifact for later re-scoring/re-plotting."""
+    """Save a bundled predictive-sampling artifact for later re-scoring/re-plotting.
+
+    Rollout state sequences go to the sibling ``*_rollouts.npz`` archive.
+    """
     n_prompts, _n_samples, k_rows, k_cols = model_samples.shape
     assert k_rows == k_cols, (
         f"expected square transition matrices, got {model_samples.shape}"
@@ -480,6 +493,14 @@ def _save_predictive_samples(
         prompt_source=np.array(prompt_source),
         n_chains=np.int64(n_chains),
     )
+    save_rollout_bundle(
+        rollout_bundle_path(path),
+        {"rollout_states": rollouts} if save_rollouts and rollouts is not None else {},
+        prompt_tokens=prompt_tokens,
+        step=np.int64(step),
+        prompt_source=np.array(prompt_source),
+        n_chains=np.int64(n_chains),
+    )
 
 
 def _compute_prior_metrics(
@@ -494,15 +515,15 @@ def _compute_prior_metrics(
 ) -> tuple[dict[str, float], dict[str, np.ndarray]]:
     """Compute prior ED/SW metrics against ID and OOD references."""
     torch.manual_seed(seed)
-    model_samples = predictive_monte_carlo_transition_matrix_chunked(
+    model_samples, rollouts = predictive_monte_carlo_transition_matrix_chunked(
         model=model,
         dataset=dataset,
         forward_recursion_steps=sampling.generation_length,
         forward_recursion_samples=sampling.num_samples,
         chunk_size=chunk_size,
         prompt=None,
+        save_rollouts=True,
     )
-    assert isinstance(model_samples, np.ndarray)
     model_samples = cast(np.ndarray, model_samples)
 
     in_distribution_reference = references.archive["baseline_in_distribution"][0]
@@ -533,6 +554,7 @@ def _compute_prior_metrics(
     }
     samples = {
         "model_samples": model_samples[None, :, :, :],
+        "rollouts": compact_token_array(rollouts)[None, :, :],
         **references.archive,
     }
     return metrics, samples
@@ -554,13 +576,14 @@ def _compute_posterior_metrics(
 ]:
     """Compute posterior ED/SW metrics averaged across many prompts."""
     torch.manual_seed(seed + 17)
-    model_samples = predictive_monte_carlo_transition_matrix_chunked(
+    model_samples, rollouts = predictive_monte_carlo_transition_matrix_chunked(
         model=model,
         dataset=dataset,
         forward_recursion_steps=sampling.generation_length,
         forward_recursion_samples=sampling.num_samples,
         chunk_size=chunk_size,
         prompt=references.prompts,
+        save_rollouts=True,
     )
     assert isinstance(model_samples, np.ndarray)
 
@@ -612,6 +635,7 @@ def _compute_posterior_metrics(
     }
     samples = {
         "model_samples": model_samples,
+        "rollouts": compact_token_array(rollouts),
         **references.archive,
     }
     return reduced_metrics, per_prompt_rows, samples
@@ -633,6 +657,7 @@ def _build_sweep_rows(
     n_chains: int,
     prompt_length: int,
     n_samples: int,
+    n_samples_prior: int,
     n_prompts: int,
 ) -> list[dict[str, float | int | str]]:
     """Convert one run's final dynamics row into sweep-style rows."""
@@ -644,7 +669,7 @@ def _build_sweep_rows(
             "checkpoint_step": checkpoint_step,
             "prompt_source": "N/A",
             "prompt_length": 0,
-            "n_samples": n_samples,
+            "n_samples": n_samples_prior,
             "n_prompts": 0,
             "dist/ed_vs_baseline_in_distribution": float(
                 final_row["ed_vs_baseline_in_distribution"]
@@ -725,6 +750,8 @@ def _analyze_run(
         ),
         seq_len=artifacts.config.seq_len,
     )
+    # The prior has no prompt to average over, so it gets its own rollout budget.
+    prior_sampling = replace(sampling, num_samples=config.n_samples_prior)
 
     checkpoint_paths = sorted(
         run_spec.checkpoint_dir.glob("checkpoint_step_*.pt"),
@@ -736,7 +763,7 @@ def _analyze_run(
     run_seed = config.seed + 10_000 * artifacts.config.n_chains
     prior_references = _prepare_prior_reference_bundle(
         artifacts.dataset,
-        n_samples=sampling.num_samples,
+        n_samples=prior_sampling.num_samples,
         id_seed=run_seed + 1,
         ood_seed=config.seed + 1,
     )
@@ -779,7 +806,7 @@ def _analyze_run(
         prior_metrics, prior_samples = _compute_prior_metrics(
             model=artifacts.model,
             dataset=artifacts.dataset,
-            sampling=sampling,
+            sampling=prior_sampling,
             n_projections=config.n_projections,
             chunk_size=config.chunk_size,
             seed=base_seed,
@@ -791,6 +818,7 @@ def _analyze_run(
             step=step,
             prompt_source="prior",
             n_chains=artifacts.config.n_chains,
+            save_rollouts=config.save_rollouts,
         )
         final_prior_samples = prior_samples
         row: dict[str, float | int] = {
@@ -819,6 +847,7 @@ def _analyze_run(
                     step=step,
                     prompt_source=f"data_{prompt_source}",
                     n_chains=artifacts.config.n_chains,
+                    save_rollouts=config.save_rollouts,
                 )
                 final_posterior_samples[prompt_source] = posterior_samples
                 row.update(_with_prompt_suffix(posterior_metrics, prompt_source))
@@ -873,6 +902,7 @@ def _analyze_run(
         step=final_step,
         prompt_source="prior",
         n_chains=artifacts.config.n_chains,
+        save_rollouts=config.save_rollouts,
     )
     for prompt_source in _PROMPT_SOURCES:
         if prompt_source in final_posterior_samples:
@@ -883,6 +913,7 @@ def _analyze_run(
                 step=final_step,
                 prompt_source=prompt_source,
                 n_chains=artifacts.config.n_chains,
+                save_rollouts=config.save_rollouts,
             )
 
     sweep_rows = _build_sweep_rows(
@@ -891,6 +922,7 @@ def _analyze_run(
         n_chains=artifacts.config.n_chains,
         prompt_length=sampling.prompt_len,
         n_samples=sampling.num_samples,
+        n_samples_prior=prior_sampling.num_samples,
         n_prompts=config.n_prompts if sampling.prompt_len > 0 else 0,
     )
     return artifacts.config.n_chains, sweep_rows

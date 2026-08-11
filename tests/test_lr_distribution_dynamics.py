@@ -116,7 +116,15 @@ def test_dynamics_run_analysis_posterior_prior_and_errors(
             "dist/ed_vs_baseline_memorising": 0.1,
             "dist/ed_vs_baseline_generalising": 0.2,
         }
-        return metrics, {"pt": np.zeros((2, 2))}, [metrics]
+        return (
+            metrics,
+            {
+                "pt": np.zeros((2, 2)),
+                "rollout_x": np.zeros((2, 3, 2)),
+                "rollout_y": np.zeros((2, 3)),
+            },
+            [metrics],
+        )
 
     monkeypatch.setattr(
         dynamics, "compute_distribution_metrics_single", fake_distribution
@@ -144,7 +152,16 @@ def test_dynamics_run_analysis_posterior_prior_and_errors(
     assert "delta_vs_baseline_memorising_on_random" in metrics
     assert "model_mse_on_data_memorising" not in metrics
     assert not any("/" in column for column in metrics.columns)
-    assert len(list((tmp_path / "samples").glob("*.npz"))) == 4
+    # one sample bundle plus one rollout bundle per (step, source)
+    assert len(list((tmp_path / "samples").glob("*.npz"))) == 8
+    assert len(list((tmp_path / "samples").glob("*_rollouts.npz"))) == 4
+
+    dynamics.run_analysis(
+        replace(posterior_config, save_rollouts=False),
+        samples_dir=tmp_path / "no_rollouts",
+    )
+    assert not list((tmp_path / "no_rollouts").glob("*_rollouts.npz"))
+    assert len(list((tmp_path / "no_rollouts").glob("*.npz"))) == 4
 
     prior_metrics, _, prior_per_prompt = dynamics.run_analysis(
         replace(posterior_config, prompt_length=0, compute_delta=False),

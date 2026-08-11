@@ -21,16 +21,21 @@ commands:
   --checkpoint-schedule logarithmic
   --linear-checkpoint-interval 500
   --n-log-checkpoints 200
-  --checkpoint-root checkpoints/bau/task_diversity
+  --pos-encoding ~POS_ENC~
+  --checkpoint-root checkpoints/bau/task_diversity_~POS_ENC~
   --use-wandb
   --no-wandb-log-model
   --seed 42
   --eval-every 1000
   --eval-batches 10
-  --log-file checkpoints/bau/task_diversity/logs/num_tasks_~NUM_TASKS~.json
+  --log-file checkpoints/bau/task_diversity_~POS_ENC~/logs/num_tasks_~NUM_TASKS~.json
 
 parameters:
   all:
+    POS_ENC:
+    - 'learned'
+    - 'rope'
+    - 'none'
     devices:
     - '0'
     - '1'

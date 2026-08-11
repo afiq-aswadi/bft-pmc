@@ -250,16 +250,17 @@ def test_predictive_monte_carlo_shapes_validation_and_chunking() -> None:
 
     prompt_x = torch.tensor([[1.0, 1.0]])
     prompt_y = torch.tensor([1.0])
-    single, ys = predictive_monte_carlo_beta(
+    single, rollout_xs, ys = predictive_monte_carlo_beta(
         model,
         normal,
         2,
         3,
         init_x=prompt_x,
         init_y=prompt_y,
-        save_y=True,
+        save_rollouts=True,
     )
     assert single.shape == (3, 2)
+    assert rollout_xs.shape == (3, 3, 2)
     assert ys.shape == (3, 3)
 
     batched = predictive_monte_carlo_beta(
@@ -272,7 +273,7 @@ def test_predictive_monte_carlo_shapes_validation_and_chunking() -> None:
     )
     assert batched.shape == (2, 2, 2)
 
-    chunked, chunked_y = predictive_monte_carlo_beta_chunked(
+    chunked, chunked_x, chunked_y = predictive_monte_carlo_beta_chunked(
         model,
         normal,
         2,
@@ -280,9 +281,10 @@ def test_predictive_monte_carlo_shapes_validation_and_chunking() -> None:
         chunk_size=2,
         init_x=prompt_x.repeat(2, 1, 1),
         init_y=prompt_y.repeat(2, 1),
-        save_y=True,
+        save_rollouts=True,
     )
     assert chunked.shape == (2, 5, 2)
+    assert chunked_x.shape == (2, 5, 3, 2)
     assert chunked_y.shape == (2, 5, 3)
     assert predictive_monte_carlo_beta_chunked(
         model,

@@ -38,16 +38,32 @@ class PredictiveRegressionModel(nn.Module):
 def _fake_pmc(
     *,
     model: PredictiveRegressionModel,
+    forward_recursion_steps: int,
     forward_recursion_samples: int,
     init_x: torch.Tensor | None,
+    save_rollouts: bool = False,
     **kwargs: object,
-) -> np.ndarray:
+) -> np.ndarray | tuple[np.ndarray, np.ndarray, np.ndarray]:
     del kwargs
-    if init_x is None:
-        return np.zeros((forward_recursion_samples, model.task_size))
-    if init_x.ndim == 2:
-        return np.zeros((forward_recursion_samples, model.task_size))
-    return np.zeros((init_x.shape[0], forward_recursion_samples, model.task_size))
+    if init_x is None or init_x.ndim == 2:
+        betas = np.zeros((forward_recursion_samples, model.task_size))
+        rollout_shape = (forward_recursion_samples, forward_recursion_steps)
+    else:
+        betas = np.zeros(
+            (init_x.shape[0], forward_recursion_samples, model.task_size)
+        )
+        rollout_shape = (
+            init_x.shape[0],
+            forward_recursion_samples,
+            forward_recursion_steps,
+        )
+    if save_rollouts:
+        return (
+            betas,
+            np.zeros((*rollout_shape, model.task_size)),
+            np.zeros(rollout_shape),
+        )
+    return betas
 
 
 def test_checkpoint_discovery_and_metadata_loading(

@@ -28,8 +28,8 @@ The experiment code expects the following layout:
 
 | Setting | Checkpoint root | Primary consumer |
 | --- | --- | --- |
-| Linear regression | `checkpoints/lr/task_diversity/<run_id>/checkpoint_step_150000.pt` | `uv run eval.py lr-sweep ...` |
-| Balls and urns | `checkpoints/bau/task_diversity/<run_id>/checkpoint_step_100000.pt` | `uv run eval.py bau-sweep ...` |
+| Linear regression | `checkpoints/lr/task_diversity_<pos_encoding>/<run_id>/checkpoint_step_150000.pt` | `uv run eval.py lr-sweep ...` |
+| Balls and urns | `checkpoints/bau/task_diversity_<pos_encoding>/<run_id>/checkpoint_step_100000.pt` | `uv run eval.py bau-sweep ...` |
 | Markov task diversity | `checkpoints/markov/task_diversity/<run_name>/checkpoint_step_*.pt` | `uv run eval.py markov-sweep ...` |
 | Markov threshold | `checkpoints/markov/task_diversity_threshold/<run_name>/checkpoint_step_*.pt` | `uv run eval.py markov-threshold ...` |
 
@@ -45,3 +45,7 @@ The experiment code expects the following layout:
   above.
 - Checkpoints are not distributed in this repository; the table documents the
   layout produced by the training and sweep commands.
+
+- LR and balls-and-urns sweeps are trained once per positional-encoding variant
+  (`learned`, `rope`, `none`), each in its own checkpoint root. The variant is
+  also recorded in the model config stored inside each checkpoint.

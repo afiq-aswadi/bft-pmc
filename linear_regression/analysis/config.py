@@ -31,14 +31,15 @@ class SweepConfig:
     # Distribution comparison parameters
     compute_distribution_metrics: bool = True
     prompt_sources: tuple[str, ...] = ("gaussian", "discrete", "random")
-    prompt_lengths: tuple[int, ...] = (0, 8, 16, 32)  # 0 = prior mode
-    n_prompts: tuple[int, ...] = (256,)  # number of prompts to average over (posterior)
-    n_samples: tuple[int, ...] = (100,)  # samples per prompt (posterior mode)
-    n_samples_prior: tuple[int, ...] = (10000,)  # samples for prior mode
+    prompt_lengths: tuple[int, ...] = (0, 32)  # 0 = prior mode
+    n_prompts: tuple[int, ...] = (128,)  # number of prompts to average over (posterior)
+    n_samples: tuple[int, ...] = (100,)  # rollouts per prompt (posterior mode)
+    n_samples_prior: tuple[int, ...] = (1024,)  # rollouts for prior mode
     n_projections: int = 100  # for sliced Wasserstein
 
-    # long rollout support (rollouts are clipped to the trained context)
-    predictive_steps: int = 256  # number of autoregressive generation steps
+    # Rollouts run to the end of the trained context: 32 prompt observations
+    # plus 223 generated ones fill the 256-observation window of every family.
+    predictive_steps: int = 223  # number of autoregressive generation steps
 
     # Marginal CDF plotting
     plot_memorising_marginals: bool = True
@@ -56,6 +57,9 @@ class SweepConfig:
     # Output
     output_dir: str = "outputs/lr/sweep_analysis"
     eval_dataset_dir: str | None = None  # path to eval dataset directory
+    # Raw PMC rollouts land in <bundle>_rollouts.npz; they dominate the on-disk
+    # size of a sweep, so this can be turned off when only estimates are needed.
+    save_rollouts: bool = True
 
     @property
     def noise_variance(self) -> float:

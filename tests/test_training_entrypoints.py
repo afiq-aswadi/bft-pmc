@@ -56,6 +56,7 @@ def _bau_config() -> bau_train.TrainConfig:
         replace(_lr_config(), d_model=0),
         replace(_lr_config(), d_model=5),
         replace(_lr_config(), learning_rate=0),
+        replace(_lr_config(), seq_len=8),
         replace(_lr_config(), bucket_type="bad"),
         replace(_lr_config(), y_min=1, y_max=1),
     ],
@@ -124,6 +125,7 @@ def test_lr_border_estimation_and_training_modes(
     [
         replace(_bau_config(), d_model=0),
         replace(_bau_config(), d_model=5),
+        replace(_bau_config(), seq_len=16),
         replace(_bau_config(), alpha_value=0),
     ],
 )

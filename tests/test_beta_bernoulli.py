@@ -64,6 +64,8 @@ def _results(config: beta_bernoulli.BetaBernoulliConfig) -> beta_bernoulli.PMCRe
         posterior_samples=np.tile(np.array([[0.4, 0.6]]), (9, 1)),
         posterior_alpha=np.full(9, 2.0),
         posterior_beta=np.full(9, 2.0),
+        prior_rollouts=np.zeros((2, 4), dtype=np.int16),
+        posterior_rollouts=np.zeros((9, 2, 4), dtype=np.int16),
     )
 
 
@@ -162,15 +164,17 @@ def test_beta_bernoulli_prompt_sampling_and_pmc(
 
     calls: list[torch.Tensor | None] = []
 
-    def fake_pmc(**kwargs: object) -> np.ndarray:
+    def fake_pmc(**kwargs: object) -> tuple[np.ndarray, np.ndarray]:
         prompt = kwargs["prompt"]
         assert prompt is None or isinstance(prompt, torch.Tensor)
+        assert kwargs["save_rollouts"] is True
         calls.append(prompt)
         probability = 0.25 if prompt is None else float(prompt.float().mean())
-        return np.tile(
+        thetas = np.tile(
             np.array([[1.0 - probability, probability]], dtype=np.float32),
             (config.num_rollouts, 1),
         )
+        return thetas, np.zeros((config.num_rollouts, 4), dtype=np.int16)
 
     monkeypatch.setattr(
         beta_bernoulli,
@@ -256,6 +260,11 @@ def test_beta_bernoulli_main_trains_or_loads_checkpoint(
     assert (train_config.output_dir / "config.json").is_file()
     with np.load(train_config.output_dir / "beta_bernoulli_pmc_samples.npz") as data:
         assert data["posterior_samples"].shape == (9, 2)
+    with np.load(
+        train_config.output_dir / "beta_bernoulli_pmc_samples_rollouts.npz"
+    ) as traces:
+        assert traces["rollout_prior_tokens"].shape == (2, 4)
+        assert traces["rollout_posterior_tokens"].shape == (9, 2, 4)
 
     checkpoint = tmp_path / "checkpoint.pt"
     load_config = replace(

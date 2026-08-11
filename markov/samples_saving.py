@@ -6,6 +6,12 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from analysis.rollouts import (
+    compact_token_array,
+    load_rollout_bundle,
+    rollout_bundle_path,
+    save_rollout_bundle,
+)
 from markov.data import MarkovChainDataset
 from markov.model import MarkovTransformer
 from markov.plotting import plot_pmc_distributions, plot_pmc_matrix_summary
@@ -24,6 +30,10 @@ class PMCSampleBundle:
     prompt_chain_index: int
     prompt_len: int
     generation_length: int
+    # Generated state sequences behind the samples above; None when a bundle is
+    # loaded without its sibling rollout archive.
+    prior_rollouts: np.ndarray | None = None
+    posterior_rollouts: np.ndarray | None = None
 
 
 @dataclass(slots=True)
@@ -46,6 +56,7 @@ class PMCSamplingConfig:
     prompt_len: int = 8
     generation_length: int = 400
     seed: int = 0
+    save_rollouts: bool = True
 
 
 def _validate_generation_request(
@@ -194,25 +205,25 @@ def get_prior_and_posterior_samples(
         )
 
         torch.manual_seed(seed)
-        prior_samples = predictive_monte_carlo_transition_matrix(
+        prior_samples, prior_rollouts = predictive_monte_carlo_transition_matrix(
             model=model,
             dataset=dataset,
             forward_recursion_steps=eval_bundle.generation_length,
             forward_recursion_samples=num_samples,
             prompt=empty_prefix,
+            save_rollouts=True,
         )
         torch.manual_seed(seed + 1)
-        posterior_samples = predictive_monte_carlo_transition_matrix(
-            model=model,
-            dataset=dataset,
-            forward_recursion_steps=eval_bundle.generation_length,
-            forward_recursion_samples=num_samples,
-            prompt=prompt_tokens,
+        posterior_samples, posterior_rollouts = (
+            predictive_monte_carlo_transition_matrix(
+                model=model,
+                dataset=dataset,
+                forward_recursion_steps=eval_bundle.generation_length,
+                forward_recursion_samples=num_samples,
+                prompt=prompt_tokens,
+                save_rollouts=True,
+            )
         )
-        if not isinstance(prior_samples, np.ndarray):
-            raise TypeError("Prior PMC unexpectedly returned rollout traces.")
-        if not isinstance(posterior_samples, np.ndarray):
-            raise TypeError("Posterior PMC unexpectedly returned rollout traces.")
 
         return PMCSampleBundle(
             prior_samples=prior_samples,
@@ -223,6 +234,8 @@ def get_prior_and_posterior_samples(
             prompt_chain_index=eval_bundle.prompt_chain_index,
             prompt_len=eval_bundle.prompt_len,
             generation_length=eval_bundle.generation_length,
+            prior_rollouts=compact_token_array(prior_rollouts),
+            posterior_rollouts=compact_token_array(posterior_rollouts),
         )
     finally:
         if was_training:
@@ -246,10 +259,27 @@ def save_pmc_samples(bundle: PMCSampleBundle, path: str | Path) -> None:
     )
 
 
+def save_pmc_rollouts(bundle: PMCSampleBundle, path: str | Path) -> Path | None:
+    """Persist the rollout traces behind a PMC sample bundle."""
+    arrays: dict[str, np.ndarray] = {}
+    if bundle.prior_rollouts is not None:
+        arrays["rollout_prior_states"] = bundle.prior_rollouts
+    if bundle.posterior_rollouts is not None:
+        arrays["rollout_posterior_states"] = bundle.posterior_rollouts
+    return save_rollout_bundle(
+        path,
+        arrays,
+        prompt_tokens=bundle.prompt_tokens,
+        prompt_chain_index=np.array(bundle.prompt_chain_index, dtype=np.int64),
+        prompt_len=np.array(bundle.prompt_len, dtype=np.int64),
+        generation_length=np.array(bundle.generation_length, dtype=np.int64),
+    )
+
+
 def load_pmc_samples(path: str | Path) -> PMCSampleBundle:
-    """Load a saved PMC sample archive."""
+    """Load a saved PMC sample archive, plus its rollout sibling when present."""
     with np.load(path) as archive:
-        return PMCSampleBundle(
+        bundle = PMCSampleBundle(
             prior_samples=archive["prior_samples"],
             posterior_samples=archive["posterior_samples"],
             training_matrices=archive["training_matrices"],
@@ -259,6 +289,12 @@ def load_pmc_samples(path: str | Path) -> PMCSampleBundle:
             prompt_len=int(archive["prompt_len"]),
             generation_length=int(archive["generation_length"]),
         )
+    rollout_path = rollout_bundle_path(path)
+    if rollout_path.is_file():
+        traces = load_rollout_bundle(rollout_path)
+        bundle.prior_rollouts = traces.get("rollout_prior_states")
+        bundle.posterior_rollouts = traces.get("rollout_posterior_states")
+    return bundle
 
 
 def resolve_pmc_sampling_config(
@@ -311,6 +347,8 @@ def generate_and_save_pmc_samples(
         seed=sampling.seed,
     )
     save_pmc_samples(bundle, output_path)
+    if sampling.save_rollouts:
+        save_pmc_rollouts(bundle, rollout_bundle_path(output_path))
     return bundle
 
 
@@ -326,6 +364,7 @@ def generate_and_save_pmc_artifacts(
     Writes the same artifact family as ``markov/run_pmc.py``:
     - ``pmc_eval_bundle.npz``
     - ``pmc_samples.npz``
+    - ``pmc_samples_rollouts.npz`` (unless ``sampling.save_rollouts`` is off)
     - ``pmc_prior.png``
     - ``pmc_posterior.png``
     - ``pmc_prior_marginals.png``

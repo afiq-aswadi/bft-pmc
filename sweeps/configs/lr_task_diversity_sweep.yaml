@@ -9,7 +9,7 @@ commands:
   --d-mlp 512
   --d-head 128
   --d-vocab 256
-  --n-ctx 128
+  --n-ctx 512
   --act-fn gelu
   --input-dim 8
   --mask-type autoregressive-pfn
@@ -22,7 +22,7 @@ commands:
   --function-type linear
   --noise-std 0.5
   --batch-size 256
-  --seq-len 64
+  --seq-len 256
   --num-steps 150000
   --learning-rate 1e-4
   --warmup-steps 1000
@@ -30,16 +30,21 @@ commands:
   --checkpoint-schedule logarithmic
   --linear-checkpoint-interval 500
   --n-log-checkpoints 200
-  --checkpoint-root checkpoints/lr/task_diversity
+  --pos-encoding ~POS_ENC~
+  --checkpoint-root checkpoints/lr/task_diversity_~POS_ENC~
   --use-wandb
   --no-wandb-log-model
   --seed 42
   --eval-every 1000
   --eval-batches 10
-  --log-file checkpoints/lr/task_diversity/logs/num_tasks_~NUM_TASKS~.json
+  --log-file checkpoints/lr/task_diversity_~POS_ENC~/logs/num_tasks_~NUM_TASKS~.json
 
 parameters:
   all:
+    POS_ENC:
+    - 'learned'
+    - 'rope'
+    - 'none'
     devices:
     - '0'
     - '1'

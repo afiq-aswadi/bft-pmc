@@ -57,9 +57,9 @@ class ThresholdConfig:
     use_wandb: bool = False
     wandb_project: str = "markov-task-diversity-threshold"
 
-    pmc_num_samples: int = 128
-    pmc_prompt_len: int = 8
-    pmc_generation_length: int = 400
+    pmc_num_samples: int = 100
+    pmc_prompt_len: int = 32
+    pmc_generation_length: int = 223
 
     def validate(self) -> None:
         if not self.experiment_name:

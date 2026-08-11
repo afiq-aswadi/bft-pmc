@@ -45,10 +45,17 @@ def _fake_theta_pmc(
     *,
     vocab_size: int,
     num_rollouts: int,
+    forward_recursion_steps: int,
+    save_rollouts: bool = False,
     **kwargs: object,
-) -> np.ndarray:
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     del kwargs
-    return np.full((num_rollouts, vocab_size), 1.0 / vocab_size)
+    thetas = np.full((num_rollouts, vocab_size), 1.0 / vocab_size)
+    if save_rollouts:
+        return thetas, np.zeros(
+            (num_rollouts, forward_recursion_steps), dtype=np.int16
+        )
+    return thetas
 
 
 def _write_eval_data(dataset_dir: Path, run_id: str = "run") -> None:
@@ -128,6 +135,8 @@ def test_shared_bau_analysis_predictive_and_sampling_paths(
     )
     assert prior_metrics == prior_per_prompt[0]
     assert (tmp_path / "prior.npz").exists()
+    with np.load(tmp_path / "prior_rollouts.npz") as rollout_archive:
+        assert rollout_archive["rollout_tokens"].shape == (1, 3, 2)
 
     posterior_metrics, posterior_per_prompt = bau_analysis.compute_distribution_metrics(
         PredictiveBAUModel(),
@@ -147,6 +156,29 @@ def test_shared_bau_analysis_predictive_and_sampling_paths(
     )
     assert len(posterior_per_prompt) == 2
     assert posterior_metrics.keys() == prior_metrics.keys()
+    with np.load(tmp_path / "posterior_rollouts.npz") as rollout_archive:
+        assert rollout_archive["rollout_tokens"].shape == (2, 3, 2)
+
+    bau_analysis.compute_distribution_metrics(
+        PredictiveBAUModel(),
+        vocab_size=2,
+        bos_token=2,
+        alpha=alpha,
+        theta_pool=theta_pool,
+        effective_steps=2,
+        n_samples=3,
+        n_projections=2,
+        chunk_size=2,
+        prompts=tokens,
+        baseline_samples=posterior_baselines,
+        samples_save_path=tmp_path / "no_rollouts.npz",
+        step=1,
+        prompt_source="data_memorising",
+        save_rollouts=False,
+    )
+    assert (tmp_path / "no_rollouts.npz").exists()
+    assert not (tmp_path / "no_rollouts_rollouts.npz").exists()
+
     with pytest.raises(ValueError, match="effective_steps"):
         bau_analysis.compute_distribution_metrics(
             PredictiveBAUModel(),
@@ -285,6 +317,14 @@ def test_bau_sweep_analysis_modes_and_errors(
         "prior",
         "data_generalising",
         "data_memorising",
+    }
+    assert {
+        path.name
+        for path in (tmp_path / "output" / "samples").glob("*_rollouts.npz")
+    } == {
+        "run__source_prior_rollouts.npz",
+        "run__source_data_generalising_rollouts.npz",
+        "run__source_data_memorising_rollouts.npz",
     }
 
     prior_only = bau_sweep.run_analysis(
@@ -434,6 +474,10 @@ def test_bau_dynamics_analysis_and_main(
     metrics, task_count, per_prompt = bau_dynamics.run_analysis(config)
     assert task_count == 2
     assert metrics["step"].tolist() == [1, 3]
+    # three prompt sources per analysed checkpoint, each with a rollout bundle
+    assert (
+        len(list((tmp_path / "output/run/samples").glob("*_rollouts.npz"))) == 6
+    )
     assert not per_prompt.empty
     assert "delta_vs_baseline_memorising_on_data_memorising" in metrics
 

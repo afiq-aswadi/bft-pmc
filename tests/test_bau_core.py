@@ -186,6 +186,34 @@ def test_bau_predictive_monte_carlo_prompt_and_chunk_paths() -> None:
     )
     assert chunked.shape == (5, 2)
 
+    with_rollouts, rollout_tokens = predictive_monte_carlo_theta(
+        model,
+        vocab_size=2,
+        forward_recursion_steps=4,
+        num_rollouts=3,
+        prompt=prompt,
+        bos_token=2,
+        save_rollouts=True,
+    )
+    # rollouts keep the prompt states and drop BOS
+    assert with_rollouts.shape == (3, 2)
+    assert rollout_tokens.shape == (3, 6)
+    assert rollout_tokens.dtype == np.int16
+    np.testing.assert_array_equal(
+        rollout_tokens[:, :2], np.tile(prompt.numpy(), (3, 1))
+    )
+
+    chunked_thetas, chunked_rollouts = predictive_monte_carlo_theta_chunked(
+        model,
+        vocab_size=2,
+        forward_recursion_steps=4,
+        num_rollouts=5,
+        chunk_size=2,
+        save_rollouts=True,
+    )
+    assert chunked_thetas.shape == (5, 2)
+    assert chunked_rollouts.shape == (5, 4)
+
 
 def test_bau_evaluator_and_scalar_metrics() -> None:
     alpha = torch.ones(2)

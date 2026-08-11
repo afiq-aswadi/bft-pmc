@@ -94,10 +94,41 @@ together with `scripts/reproduce_paper.sh` when regenerating figures.
 The unified training entry point dispatches to each task family:
 
 ```bash
-uv run train.py lr --num-tasks 32 --num-steps 10 --batch-size 8 --seq-len 16 --no-use-wandb
+uv run train.py lr --num-tasks 32 --num-steps 10 --batch-size 8 --seq-len 16 --n-ctx 32 --no-use-wandb
 uv run train.py bau --num-tasks 32 --num-steps 10 --batch-size 8 --seq-len 16 --no-use-wandb
 uv run train.py markov --config-path markov/train.yaml --n-chains 32 --max-steps 10 --no-use-wandb
 ```
+
+### Positional encodings
+
+The LR and balls-and-urns transformers train under three positional-encoding
+variants, selected with `--pos-encoding`:
+
+| Variant | Flag | Model configuration |
+| --- | --- | --- |
+| Learned absolute | `--pos-encoding learned` (default) | `positional_embedding_type="standard"` |
+| Rotary | `--pos-encoding rope` | `positional_embedding_type="rotary"` |
+| None | `--pos-encoding none` | `use_pos_emb=False` |
+
+The variant is stored in the model config inside every checkpoint, so
+`models.pos_encoding.positional_encoding_of` recovers it during analysis. The sweep
+configs train each task count under all three, writing to
+`checkpoints/{lr,bau}/task_diversity_<variant>/`. The Markov model uses rotary
+embeddings throughout and has no such flag.
+
+### Sequence budgets
+
+All three families hold **256 positions**, so a rollout is 32 prompt
+observations plus 223 generated ones (`N = 255`) in every setting:
+
+| Family | Context | Rollout capacity |
+| --- | --- | --- |
+| Linear regression | `n_ctx = 512` (256 interleaved x/y pairs) | 224 pairs after a 32-pair prompt |
+| Balls and urns | `n_ctx = 256` (BOS + 255 tokens) | 223 tokens after a 32-token prompt |
+| Markov | `seq_len = 256` (BOS + 255 states) | 224 states after a 32-state prompt |
+
+The evaluation entry points draw 128 prompts with 100 rollouts each for
+posterior mode and 1024 rollouts for prior mode, identically across families.
 
 The continuous-prior Beta-Bernoulli experiment introduced in Figure 1 and
 detailed in Appendix E is available as a separate training-and-PMC entry point.
@@ -145,12 +176,47 @@ aggregate figures.
 | `uv run eval.py bau-sweep ...` | Evaluate a balls-and-urns checkpoint sweep |
 | `uv run eval.py markov-sweep ...` | Evaluate a Markov checkpoint sweep |
 | `uv run eval.py markov-threshold ...` | Run the Markov task-diversity threshold experiment |
+| `uv run eval.py path-stability ...` | Scaled-L1 rollout convergence diagnostic across families |
 | `uv run eval.py plot-lr-sweep ...` | Plot the LR task-diversity sweep |
 | `uv run eval.py plot-lr-dynamics ...` | Plot LR training dynamics |
 | `uv run eval.py plot-bau-sweep ...` | Plot the balls-and-urns sweep |
 | `uv run eval.py plot-bau-dynamics ...` | Plot balls-and-urns training dynamics |
 | `uv run eval.py plot-markov-sweep ...` | Plot the Markov task-diversity sweep |
 | `uv run eval.py plot-markov-dynamics ...` | Plot Markov training dynamics |
+
+### Rollout convergence (path stability)
+
+`path-stability` reproduces the scaled-L1 convergence diagnostic of Ng et al.,
+*TabMGP: Martingale Posterior with TabPFN* (Figure 3, Appendix F), for the three
+families here. For each saved rollout it re-evaluates the family's own PMC
+estimator on every prefix and reports
+
+    E[ (1/p) || theta(F_n) - theta(F_N) ||_1 ]   against   N - n,
+
+so a curve that flattens at a non-zero constant is evidence that `theta(F_inf)`
+exists. Trajectories start at exactly zero by construction.
+
+```bash
+uv run eval.py path-stability \
+  --inputs rope=outputs/lr/sweep_analysis_rope/sweep_*/samples \
+           learned=outputs/lr/sweep_analysis_learned/sweep_*/samples \
+  --output-dir outputs/path_stability/lr
+```
+
+Inputs are rollout bundles, directories of them, or `label=path` pairs; prior
+bundles are skipped because they have no observed data to anchor `theta(F_n)`.
+The run writes everything needed to redraw the figure without touching a
+checkpoint or a rollout again:
+
+| File | Contents |
+| --- | --- |
+| `path_stability.csv` | One row per setup and prefix: `T`, `scaled_l1`, `p`, `prompt_len`, and the bundle's own metadata (step, prompt source, task count) |
+| `path_stability_per_prompt.csv` | The same, resolved per prompt, i.e. per realisation of `z_1:n` |
+| `theta_reference.npz` | `theta(F_n)`, `theta(F_N)`, and the prefix grid per setup |
+| `path_stability.png` / `.pdf` | The figure |
+
+Pass `--stride` to evaluate on a coarser prefix grid, and `--per-prompt-curves`
+to draw one line per prompt rather than one per setup.
 
 The lower-level plotters live with their task family. In particular, each
 family has one canonical aggregate sweep plotter, one dynamics plotter, and one
@@ -180,14 +246,22 @@ documented in
 [`paper_data/README.md`](paper_data/README.md#generate-sample-bundles-for-marginal-plots).
 Checkpoint layouts are documented in [`MODEL_ZOO.md`](MODEL_ZOO.md).
 
+Each sample bundle is saved with a sibling `<name>_rollouts.npz` holding the raw
+generated sequences behind its estimates, so a PMC estimate can be audited or
+re-derived without rerunning generation. These traces are much larger than the
+estimates themselves and can be skipped with `--no-save-rollouts`; the file
+layout and per-entry-point flags are documented in
+[`paper_data/README.md`](paper_data/README.md#rollout-traces).
+
 ## Repository layout
 
 ```text
-analysis/                 checkpoint helpers shared across task families
+analysis/                 shared checkpoint, rollout, and diagnostic utilities
 assets/                   curated README figure
 balls_and_urns/           balls-and-urns training, evaluation, and figures
 linear_regression/        LR training, evaluation, and figures
 markov/                   Markov training, evaluation, and figures
+models/                   shared model-configuration helpers (positional encodings)
 plotting/                 shared marginal-cell rendering primitives
 pfn_transformers/         vendored PFN TransformerLens library and its tests
 scripts/                  reproduction and frozen-data preparation utilities

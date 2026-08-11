@@ -8,6 +8,7 @@ import numpy as np
 import torch
 from jaxtyping import Float
 
+from analysis.rollouts import compact_token_array
 from pfn_transformerlens.model.PFN import UnsupervisedPFN
 
 
@@ -20,7 +21,8 @@ def predictive_monte_carlo_theta(
     prompt: Float[torch.Tensor, " K_init"] | None = None,
     bos_token: int | None = None,
     temperature: float = 1.0,
-) -> np.ndarray:
+    save_rollouts: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Generate rollouts and extract theta estimates via empirical frequencies.
 
     Args:
@@ -31,10 +33,13 @@ def predictive_monte_carlo_theta(
         prompt: Optional context tokens (without BOS). Shape (K_init,).
         bos_token: BOS token index. If provided, prepended to prompt.
         temperature: Sampling temperature.
+        save_rollouts: Also return the token sequences the estimates came from.
 
     Returns:
         Theta estimates, shape (num_rollouts, vocab_size). Each row is an
-        empirical frequency vector from one rollout.
+        empirical frequency vector from one rollout. If save_rollouts=True,
+        also returns the BOS-stripped rollout tokens, shape
+        (num_rollouts, prompt_len + forward_recursion_steps).
     """
     device = next(model.parameters()).device
 
@@ -70,7 +75,10 @@ def predictive_monte_carlo_theta(
     one_hot = torch.nn.functional.one_hot(data_tokens.long(), vocab_size).float()
     thetas = one_hot.mean(dim=1)
 
-    return thetas.cpu().numpy()
+    thetas_np = thetas.cpu().numpy()
+    if save_rollouts:
+        return thetas_np, compact_token_array(data_tokens.long().cpu().numpy())
+    return thetas_np
 
 
 @torch.no_grad()
@@ -83,20 +91,23 @@ def predictive_monte_carlo_theta_chunked(
     bos_token: int | None = None,
     temperature: float = 1.0,
     chunk_size: int = 100,
-) -> np.ndarray:
+    save_rollouts: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     """Chunked Predictive Monte Carlo over the rollout sample axis.
 
     Processes rollouts in chunks to avoid OOM on large num_rollouts.
 
     Returns:
-        Theta estimates, shape (num_rollouts, vocab_size).
+        Theta estimates, shape (num_rollouts, vocab_size). If save_rollouts=True,
+        also returns the rollout tokens, shape (num_rollouts, total_len).
     """
     all_thetas = []
+    all_rollouts = []
     remaining = num_rollouts
 
     while remaining > 0:
         chunk = min(remaining, chunk_size)
-        thetas = predictive_monte_carlo_theta(
+        result = predictive_monte_carlo_theta(
             model=model,
             vocab_size=vocab_size,
             forward_recursion_steps=forward_recursion_steps,
@@ -104,8 +115,20 @@ def predictive_monte_carlo_theta_chunked(
             prompt=prompt,
             bos_token=bos_token,
             temperature=temperature,
+            save_rollouts=save_rollouts,
         )
+        if save_rollouts:
+            thetas, rollouts = result
+            all_rollouts.append(rollouts)
+        else:
+            assert isinstance(result, np.ndarray)
+            thetas = result
         all_thetas.append(thetas)
         remaining -= chunk
 
+    if save_rollouts:
+        return (
+            np.concatenate(all_thetas, axis=0),
+            np.concatenate(all_rollouts, axis=0),
+        )
     return np.concatenate(all_thetas, axis=0)

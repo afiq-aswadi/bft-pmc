@@ -19,20 +19,33 @@ def _fake_pmc(
     *,
     dataset: MarkovChainDataset,
     forward_recursion_samples: int,
+    forward_recursion_steps: int,
     prompt: torch.Tensor | None,
+    save_rollouts: bool = False,
     **kwargs: object,
-) -> np.ndarray:
+) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
     del kwargs
     matrix = np.full((dataset.k, dataset.k), 1.0 / dataset.k)
     if prompt is not None and prompt.ndim == 2:
-        return np.tile(matrix, (prompt.shape[0], forward_recursion_samples, 1, 1))
-    return np.tile(matrix, (forward_recursion_samples, 1, 1))
+        matrices = np.tile(matrix, (prompt.shape[0], forward_recursion_samples, 1, 1))
+        rollout_shape = (
+            prompt.shape[0],
+            forward_recursion_samples,
+            prompt.shape[1] + forward_recursion_steps,
+        )
+    else:
+        matrices = np.tile(matrix, (forward_recursion_samples, 1, 1))
+        rollout_shape = (forward_recursion_samples, forward_recursion_steps)
+    if save_rollouts:
+        return matrices, np.zeros(rollout_shape, dtype=np.int64)
+    return matrices
 
 
 @pytest.mark.parametrize(
     "config",
     [
         sweep.SweepConfig(n_samples=0),
+        sweep.SweepConfig(n_samples_prior=0),
         sweep.SweepConfig(n_prompts=-1),
         sweep.SweepConfig(prompt_len=-1),
         sweep.SweepConfig(generation_length=1),
@@ -373,6 +386,26 @@ def test_analyze_run_prior_and_posterior_paths(
     ]
     assert (tmp_path / "runs/run/metrics.csv").exists()
     assert (tmp_path / "runs/run/per_prompt_metrics.csv").exists()
+    # two checkpoints x (prior + two prompt sources), each with a rollout bundle
+    assert len(list((tmp_path / "runs/run/samples").glob("*_rollouts.npz"))) == 6
+    assert {
+        path.name for path in (tmp_path / "sweep_samples").glob("*_rollouts.npz")
+    } == {
+        "M2_prior_rollouts.npz",
+        "M2_in_distribution_L2_rollouts.npz",
+        "M2_out_of_distribution_L2_rollouts.npz",
+    }
+
+    plotted.clear()
+    sweep._analyze_run(
+        run_spec,
+        config=replace(config, save_rollouts=False),
+        device=torch.device("cpu"),
+        runs_output_root=tmp_path / "no_rollout_runs",
+        sweep_samples_dir=tmp_path / "no_rollout_samples",
+    )
+    assert not list((tmp_path / "no_rollout_samples").glob("*_rollouts.npz"))
+    assert list((tmp_path / "no_rollout_samples").glob("*.npz"))
 
     plotted.clear()
     prior_n_chains, prior_rows = sweep._analyze_run(

@@ -16,6 +16,7 @@ from pfn_transformerlens.train import TrainingConfig, train
 from pfn_transformerlens.wandb_utils import RunNameScheme, create_run_name
 from linear_regression.likelihoods import linear_regression
 from linear_regression.priors import DiscretePrior
+from models.pos_encoding import PositionalEncoding, positional_encoding_kwargs
 
 
 @dataclass
@@ -76,9 +77,11 @@ class TrainConfig:
     d_mlp: int = 512
     d_head: int = 128
     d_vocab: int = 256
-    n_ctx: int = 128
+    # 512 positions = 256 interleaved (x, y) pairs, matching BAU and Markov.
+    n_ctx: int = 512
     act_fn: str = "gelu"
     input_dim: int = 8
+    pos_encoding: PositionalEncoding = "learned"
 
     # model behavior
     mask_type: Literal["autoregressive-pfn", "gpt2"] = "autoregressive-pfn"
@@ -97,7 +100,7 @@ class TrainConfig:
 
     # training
     batch_size: int = 256
-    seq_len: int = 64
+    seq_len: int = 256
     num_steps: int = 150000
     learning_rate: float = 1e-4
     warmup_steps: int = 1000
@@ -144,6 +147,9 @@ class TrainConfig:
             raise ValueError("Model, data, and training dimensions must be positive.")
         if self.d_model != self.n_heads * self.d_head:
             raise ValueError("d_model must equal n_heads times d_head.")
+        # x and y occupy one position each, so a length-S sequence needs 2S positions.
+        if 2 * self.seq_len > self.n_ctx:
+            raise ValueError("2 * seq_len must fit within the model context n_ctx.")
         if self.learning_rate <= 0 or self.noise_std < 0:
             raise ValueError(
                 "learning_rate must be positive and noise_std non-negative."
@@ -208,6 +214,7 @@ def main(cfg: TrainConfig) -> None:
         riemann_borders=riemann_borders,
         y_min=y_min,
         y_max=y_max,
+        **positional_encoding_kwargs(cfg.pos_encoding),
     )
 
     # eval generator uses Gaussian (continuous) prior for generalization measurement
@@ -233,6 +240,7 @@ def main(cfg: TrainConfig) -> None:
         model_config=model_cfg,
         data_config=data_cfg,
         scheme=SCHEME,
+        extra={"pos": cfg.pos_encoding},
     )
 
     train_cfg = TrainingConfig(

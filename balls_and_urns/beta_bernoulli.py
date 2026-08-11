@@ -17,6 +17,7 @@ import tyro
 if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+from analysis.rollouts import rollout_bundle_path, save_rollout_bundle
 from balls_and_urns.data import BOSGenerator, make_bau_generator
 from balls_and_urns.predictive_monte_carlo import (
     predictive_monte_carlo_theta_chunked,
@@ -77,6 +78,7 @@ class BetaBernoulliConfig:
 
     seed: int = 0
     pmc_seed: int = 1
+    save_rollouts: bool = True
     device: str = "auto"
     use_wandb: bool = False
     wandb_project: str | None = None
@@ -137,6 +139,10 @@ class PMCResults:
     posterior_samples: Float[np.ndarray, "prompt rollout"]
     posterior_alpha: Float[np.ndarray, " prompt"]
     posterior_beta: Float[np.ndarray, " prompt"]
+    # Raw generated token streams behind the samples above. Absent when results
+    # are reloaded from a bundle that predates rollout saving.
+    prior_rollouts: Int[np.ndarray, "rollout total_len"] | None = None
+    posterior_rollouts: Int[np.ndarray, "prompt rollout total_len"] | None = None
 
 
 def train_beta_bernoulli(config: BetaBernoulliConfig) -> UnsupervisedPFN:
@@ -234,7 +240,7 @@ def compute_pmc_results(
     model.eval()
     prompts = sample_prompts(config)
     torch.manual_seed(config.pmc_seed)
-    prior_theta = predictive_monte_carlo_theta_chunked(
+    prior_theta, prior_rollouts = predictive_monte_carlo_theta_chunked(
         model=model,
         vocab_size=2,
         forward_recursion_steps=config.forward_recursion_steps,
@@ -242,6 +248,7 @@ def compute_pmc_results(
         prompt=None,
         bos_token=2,
         chunk_size=config.chunk_size,
+        save_rollouts=True,
     )
     assert prior_theta.shape == (config.num_rollouts, 2)
 
@@ -249,8 +256,9 @@ def compute_pmc_results(
         (len(config.theta_stars), config.num_rollouts),
         dtype=np.float32,
     )
+    posterior_rollouts = []
     for index, prompt in enumerate(prompts):
-        posterior_theta = predictive_monte_carlo_theta_chunked(
+        posterior_theta, rollout_tokens = predictive_monte_carlo_theta_chunked(
             model=model,
             vocab_size=2,
             forward_recursion_steps=config.forward_recursion_steps,
@@ -258,9 +266,11 @@ def compute_pmc_results(
             prompt=prompt,
             bos_token=2,
             chunk_size=config.chunk_size,
+            save_rollouts=True,
         )
         assert posterior_theta.shape == (config.num_rollouts, 2)
         posterior_samples[index] = posterior_theta[:, 1]
+        posterior_rollouts.append(rollout_tokens)
 
     num_ones = prompts.sum(dim=1).numpy()
     posterior_alpha = config.prior_alpha + num_ones
@@ -272,6 +282,8 @@ def compute_pmc_results(
         posterior_samples=posterior_samples,
         posterior_alpha=posterior_alpha,
         posterior_beta=posterior_beta,
+        prior_rollouts=prior_rollouts,
+        posterior_rollouts=np.stack(posterior_rollouts, axis=0),
     )
 
 
@@ -463,14 +475,28 @@ def main(config: BetaBernoulliConfig) -> None:
         assert isinstance(model, UnsupervisedPFN)
 
     results = compute_pmc_results(model, config)
+    samples_path = config.output_dir / "beta_bernoulli_pmc_samples.npz"
     np.savez_compressed(
-        config.output_dir / "beta_bernoulli_pmc_samples.npz",
+        samples_path,
         theta_stars=results.theta_stars,
         prompts=results.prompts,
         prior_samples=results.prior_samples,
         posterior_samples=results.posterior_samples,
         posterior_alpha=results.posterior_alpha,
         posterior_beta=results.posterior_beta,
+    )
+    assert results.prior_rollouts is not None
+    assert results.posterior_rollouts is not None
+    save_rollout_bundle(
+        rollout_bundle_path(samples_path),
+        {
+            "rollout_prior_tokens": results.prior_rollouts,
+            "rollout_posterior_tokens": results.posterior_rollouts,
+        }
+        if config.save_rollouts
+        else {},
+        theta_stars=results.theta_stars,
+        prompts=results.prompts,
     )
     plot_pmc_grid(
         results,

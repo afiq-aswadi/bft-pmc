@@ -10,6 +10,7 @@ from torch import nn
 
 from markov.data import MarkovChainDataset
 import markov.samples_saving as samples_saving
+from analysis.rollouts import rollout_bundle_path
 
 
 class SampleModel(nn.Module):
@@ -22,13 +23,21 @@ def _fake_matrix_samples(
     *,
     dataset: MarkovChainDataset,
     forward_recursion_samples: int,
+    forward_recursion_steps: int,
+    prompt: torch.Tensor | None = None,
     **kwargs: object,
-) -> np.ndarray:
+) -> tuple[np.ndarray, np.ndarray]:
     del kwargs
-    return np.full(
+    prompt_len = 0 if prompt is None else int(prompt.numel())
+    matrices = np.full(
         (forward_recursion_samples, dataset.k, dataset.k),
         1.0 / dataset.k,
     )
+    rollouts = np.zeros(
+        (forward_recursion_samples, prompt_len + forward_recursion_steps),
+        dtype=np.int64,
+    )
+    return matrices, rollouts
 
 
 @pytest.mark.parametrize(
@@ -140,44 +149,45 @@ def test_pmc_sample_generation_and_round_trip(
     assert loaded.prompt_chain_index == bundle.prompt_chain_index
 
 
-def test_pmc_sample_generation_rejects_rollout_trace_tuples(
+def test_pmc_rollouts_are_saved_beside_samples_and_reloaded(
+    tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     dataset = MarkovChainDataset(2, 6, 2, "cpu", seed=2)
     model = SampleModel()
     eval_bundle = samples_saving.build_pmc_eval_bundle(dataset, 1, 3)
-    rollout_tuple = (
-        np.full((2, 2, 2), 0.5),
-        np.zeros((2, 3), dtype=np.int64),
-    )
     monkeypatch.setattr(
         samples_saving,
         "predictive_monte_carlo_transition_matrix",
-        lambda **kwargs: rollout_tuple,
+        _fake_matrix_samples,
     )
-    with pytest.raises(TypeError, match="Prior PMC"):
-        samples_saving.get_prior_and_posterior_samples(
-            model,
-            dataset,
-            eval_bundle,
-            num_samples=2,
-            seed=1,
-        )
+    bundle = samples_saving.get_prior_and_posterior_samples(
+        model,
+        dataset,
+        eval_bundle,
+        num_samples=2,
+        seed=1,
+    )
+    assert bundle.prior_rollouts is not None
+    assert bundle.posterior_rollouts is not None
+    # prior rollouts have no prompt states; posterior rollouts keep the prompt
+    assert bundle.prior_rollouts.shape == (2, 3)
+    assert bundle.posterior_rollouts.shape == (2, 4)
 
-    results = iter([np.full((2, 2, 2), 0.5), rollout_tuple])
-    monkeypatch.setattr(
-        samples_saving,
-        "predictive_monte_carlo_transition_matrix",
-        lambda **kwargs: next(results),
+    path = tmp_path / "samples/bundle.npz"
+    samples_saving.save_pmc_samples(bundle, path)
+    rollout_path = rollout_bundle_path(path)
+    assert samples_saving.save_pmc_rollouts(bundle, rollout_path) == rollout_path
+
+    loaded = samples_saving.load_pmc_samples(path)
+    np.testing.assert_array_equal(loaded.prior_rollouts, bundle.prior_rollouts)
+    np.testing.assert_array_equal(loaded.posterior_rollouts, bundle.posterior_rollouts)
+
+    without_traces = replace(bundle, prior_rollouts=None, posterior_rollouts=None)
+    assert (
+        samples_saving.save_pmc_rollouts(without_traces, tmp_path / "bare.npz") is None
     )
-    with pytest.raises(TypeError, match="Posterior PMC"):
-        samples_saving.get_prior_and_posterior_samples(
-            model,
-            dataset,
-            eval_bundle,
-            num_samples=2,
-            seed=1,
-        )
+    assert not (tmp_path / "bare.npz").exists()
 
 
 def test_pmc_sampling_resolution_and_generation_helpers(

@@ -13,6 +13,7 @@ import tyro
 from tqdm import tqdm
 
 from analysis.checkpoints import find_all_checkpoints
+from analysis.rollouts import save_samples_and_rollouts
 from linear_regression.analysis.config import SweepConfig
 from linear_regression.analysis.data import load_run_info
 from linear_regression.analysis.metrics import (
@@ -43,10 +44,10 @@ class DynamicsConfig:
     run_id: str = ""
     checkpoint_root: str = "checkpoints/lr/task_diversity"
 
-    prompt_length: int = 8
+    prompt_length: int = 32
     n_samples: int = 100
-    n_prompts: int = 50
-    predictive_steps: int = 256
+    n_prompts: int = 128
+    predictive_steps: int = 223
     n_projections: int = 100
 
     compute_distribution: bool = True
@@ -64,6 +65,7 @@ class DynamicsConfig:
     output_dir: str = "outputs/lr/distribution_dynamics"
     eval_dataset_dir: str | None = None
     device: str | None = None
+    save_rollouts: bool = True
 
     @property
     def noise_variance(self) -> float:
@@ -227,11 +229,15 @@ def run_analysis(
                         }
                     )
                 if samples_dir is not None:
-                    samples_dir.mkdir(parents=True, exist_ok=True)
                     sample_suffix = SOURCE_NAMES.get(source, "prior")
-                    np.savez(
+                    save_samples_and_rollouts(
                         samples_dir / f"step_{step}_{sample_suffix}.npz",
-                        **source_samples,
+                        source_samples,
+                        save_rollouts=config.save_rollouts,
+                        prompt_len=np.int64(config.prompt_length),
+                        prompt_source=sample_suffix,
+                        num_tasks=np.int64(num_tasks),
+                        step=np.int64(step),
                     )
 
         results.append({"step": step, **metrics})

@@ -15,6 +15,7 @@ from balls_and_urns.data import (
     make_bau_generator,
     make_discrete_bau_generator,
 )
+from models.pos_encoding import PositionalEncoding, positional_encoding_kwargs
 from pfn_transformerlens import UnsupervisedConfig
 from pfn_transformerlens.train import TrainingConfig, train
 from pfn_transformerlens.wandb_utils import RunNameScheme, create_run_name
@@ -51,8 +52,10 @@ class TrainConfig:
     n_layers: int = 2
     n_heads: int = 4
     d_head: int = 32
-    n_ctx: int = 128
+    # 256 positions = BOS + 255 observations, matching the LR and Markov models.
+    n_ctx: int = 256
     act_fn: str = "gelu"
+    pos_encoding: PositionalEncoding = "learned"
 
     # task
     vocab_size: int = 4
@@ -61,7 +64,7 @@ class TrainConfig:
 
     # training
     batch_size: int = 128
-    seq_len: int = 64
+    seq_len: int = 256
     num_steps: int = 50000
     learning_rate: float = 1e-3
     warmup_steps: int = 500
@@ -105,6 +108,8 @@ class TrainConfig:
             raise ValueError("Model, data, and training dimensions must be positive.")
         if self.d_model != self.n_heads * self.d_head:
             raise ValueError("d_model must equal n_heads times d_head.")
+        if self.seq_len > self.n_ctx:
+            raise ValueError("seq_len must fit within the model context n_ctx.")
         if self.alpha_value <= 0 or self.learning_rate <= 0:
             raise ValueError("alpha_value and learning_rate must be positive.")
 
@@ -135,6 +140,7 @@ def main(cfg: TrainConfig) -> None:
         input_type="discrete",
         prediction_type="distribution",
         act_fn=cfg.act_fn,
+        **positional_encoding_kwargs(cfg.pos_encoding),
     )
 
     data_cfg = DataConfig(
@@ -149,6 +155,7 @@ def main(cfg: TrainConfig) -> None:
         model_config=model_cfg,
         data_config=data_cfg,
         scheme=SCHEME,
+        extra={"pos": cfg.pos_encoding},
     )
 
     train_cfg = TrainingConfig(

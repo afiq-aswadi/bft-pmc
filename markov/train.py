@@ -76,9 +76,10 @@ class TrainConfig:
     run_name_suffix: str = ""
 
     # PMC sample saving
-    pmc_num_samples: int = 128
-    pmc_prompt_len: int = 8
-    pmc_generation_length: int = 400
+    pmc_num_samples: int = 100
+    pmc_prompt_len: int = 32
+    pmc_generation_length: int = 223
+    pmc_save_rollouts: bool = True
 
     # logging
     use_wandb: bool = False
@@ -410,6 +411,7 @@ def main(args: TrainConfig) -> None:
             num_samples=args.pmc_num_samples,
             prompt_len=args.pmc_prompt_len,
             generation_length=args.pmc_generation_length,
+            save_rollouts=args.pmc_save_rollouts,
         ),
         use_wandb=args.use_wandb,
         wandb_project=args.wandb_project,

@@ -30,6 +30,7 @@ TYRO_ENTRYPOINTS = [
     "markov/sweep_analysis.py",
     "markov/task_diversity_threshold.py",
     "markov/train.py",
+    "analysis/path_stability.py",
     "sweeps/run_yaml_sweep.py",
 ]
 
@@ -41,6 +42,7 @@ ARGPARSE_ENTRYPOINTS = [
     "markov/plot_matrix_marginals.py",
     "markov/plot_sweep_combined.py",
     "markov/plot_sweep_prior.py",
+    "scripts/plot_intro_identifiability.py",
 ]
 
 

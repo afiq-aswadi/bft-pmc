@@ -13,6 +13,7 @@ TARGETS = {
     "bau-sweep": ROOT / "balls_and_urns" / "sweep_analysis.py",
     "markov-sweep": ROOT / "markov" / "sweep_analysis.py",
     "markov-threshold": ROOT / "markov" / "task_diversity_threshold.py",
+    "path-stability": ROOT / "analysis" / "path_stability.py",
     "plot-lr-sweep": ROOT / "linear_regression" / "plot_sweep_combined.py",
     "plot-lr-dynamics": ROOT / "linear_regression" / "plot_dynamics_combined.py",
     "plot-bau-sweep": ROOT / "balls_and_urns" / "plot_sweep_combined.py",
@@ -31,6 +32,7 @@ Commands:
   bau-sweep         Evaluate the balls-and-urns sweep from saved checkpoints.
   markov-sweep      Evaluate the Markov sweep from saved checkpoints.
   markov-threshold  Run the Markov task-diversity threshold experiment.
+  path-stability    Scaled-L1 rollout convergence diagnostic (jellyfish plot).
   plot-lr-sweep     Regenerate the linear-regression sweep figure from metrics.csv.
   plot-lr-dynamics  Regenerate the linear-regression dynamics figure from metrics.csv.
   plot-bau-sweep    Regenerate the balls-and-urns sweep figure from metrics.csv.
@@ -41,6 +43,7 @@ Commands:
 Examples:
   uv run eval.py lr-sweep --checkpoint-root checkpoints/lr/task_diversity
   uv run eval.py markov-sweep --checkpoint-root checkpoints/markov/task_diversity
+  uv run eval.py path-stability --inputs rope=outputs/lr/sweep_analysis_rope/sweep_*/samples
   uv run eval.py plot-lr-sweep --metrics-csv paper_data/lr/sweep/metrics.csv
   uv run eval.py plot-markov-sweep --runs-dir paper_data/markov/sweep/runs --metrics-csv paper_data/markov/sweep/metrics.csv
   uv run eval.py plot-bau-dynamics --metrics-csv paper_data/bau/dynamics/metrics.csv

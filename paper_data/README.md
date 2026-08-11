@@ -203,12 +203,42 @@ uv run python -m markov.plot_matrix_marginals \
 Use `uv run eval.py <task>-sweep --help` to inspect sampling counts, prompt
 lengths, device selection, and other evaluation arguments.
 
+### Rollout traces
+
+Every PMC estimator reduces a batch of generated sequences to a task estimate.
+Those sequences are the rollouts, and each sample bundle is written together
+with a sibling `<name>_rollouts.npz` holding them:
+
+| Producer | Rollout file | Arrays |
+| --- | --- | --- |
+| LR sweep and dynamics | `T{M}_prior_rollouts.npz`, `T{M}_{discrete,gaussian}_L{L}_rollouts.npz`, `step_{step}_{source}_rollouts.npz` | `rollout_x` `(..., samples, total_len, dim)` and `rollout_y` `(..., samples, total_len)` |
+| BAU sweep and dynamics | `{run_id}__source_{source}_rollouts.npz`, `step{step}__source_{source}_rollouts.npz` | `rollout_tokens` `(prompts, samples, total_len)` |
+| Markov sweep | `M{M}_{prior,in_distribution_L8,out_of_distribution_L8}_rollouts.npz`, `step{step}__source_{source}_rollouts.npz` | `rollout_states` `(prompts, samples, total_len)` |
+| `train.py markov`, `markov/run_pmc.py` | `pmc_samples_rollouts.npz` | `rollout_prior_states` and `rollout_posterior_states` |
+| `train.py beta-bernoulli` | `beta_bernoulli_pmc_samples_rollouts.npz` | `rollout_prior_tokens` and `rollout_posterior_tokens` |
+
+Posterior rollouts keep the conditioning prompt as their prefix; prior rollouts
+contain only generated states. Discrete rollouts are stored in the smallest
+lossless integer dtype, and every archive is compressed. Load one with
+`analysis.rollouts.load_rollout_bundle`.
+
+`uv run eval.py path-stability` reads these files to recompute each family's
+estimator on rollout *prefixes*; no other plotter touches them. They also let an
+estimate be audited or re-derived — different count smoothing, a truncated
+rollout, sequence-level diagnostics — without rerunning generation. They are
+much larger than the estimates they explain, so each producer takes a flag to
+skip them:
+`--no-save-rollouts` for the `eval.py` sweep commands, the LR and BAU dynamics
+entry points, `markov/run_pmc.py`, and `train.py beta-bernoulli`;
+`--no-pmc-save-rollouts` for `train.py markov`.
+
 ## Data not included
 
 The following artifacts are intentionally external:
 
 - Predictive Monte Carlo sample bundles (`samples/*.npz`), including the Markov
   transition-matrix bundles;
+- the matching rollout bundles (`samples/*_rollouts.npz`);
 - model checkpoints.
 
 The sample bundles are required for the marginal figures and let metrics be

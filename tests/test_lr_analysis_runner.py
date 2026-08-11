@@ -355,7 +355,15 @@ def test_sweep_runner_orchestration_and_errors(
     ) -> tuple[dict[str, float], dict[str, np.ndarray], list[dict[str, float]]]:
         del args, kwargs
         metrics = {"dist/ed_vs_baseline_memorising": 0.1}
-        return metrics, {"pt": np.zeros((2, 2))}, [metrics]
+        return (
+            metrics,
+            {
+                "pt": np.zeros((2, 2)),
+                "rollout_x": np.zeros((2, 3, 2)),
+                "rollout_y": np.zeros((2, 3)),
+            },
+            [metrics],
+        )
 
     monkeypatch.setattr(
         runner, "compute_distribution_metrics_single", fake_distribution
@@ -372,6 +380,13 @@ def test_sweep_runner_orchestration_and_errors(
     metrics, per_prompt = runner.run_analysis(config, tmp_path / "out")
     assert len(metrics) == 4
     assert len(per_prompt) == 4
+    samples_dir = tmp_path / "out" / "samples"
+    assert {path.name for path in samples_dir.glob("*_rollouts.npz")} == {
+        "T2_prior_rollouts.npz",
+        "T2_discrete_L2_rollouts.npz",
+        "T2_gaussian_L2_rollouts.npz",
+        "T2_random_L2_rollouts.npz",
+    }
     assert set(metrics["prompt_source"]) == {
         "N/A",
         "memorising",

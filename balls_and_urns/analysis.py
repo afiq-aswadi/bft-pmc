@@ -168,6 +168,7 @@ def compute_distribution_metrics(
     samples_save_path: Path,
     step: int,
     prompt_source: str,
+    save_rollouts: bool = True,
 ) -> tuple[dict[str, float], list[dict[str, float]]]:
     """Compute ED/SW and persist the Predictive Monte Carlo sample bundle."""
     if effective_steps < 1:
@@ -176,7 +177,7 @@ def compute_distribution_metrics(
 
     if prompts is None:
         assert isinstance(baseline_samples, dict)
-        model_samples = predictive_monte_carlo_theta_chunked(
+        model_samples, rollout_tokens = predictive_monte_carlo_theta_chunked(
             model=model,
             vocab_size=vocab_size,
             forward_recursion_steps=effective_steps,
@@ -184,6 +185,7 @@ def compute_distribution_metrics(
             prompt=None,
             bos_token=bos_token,
             chunk_size=chunk_size,
+            save_rollouts=True,
         )
         per_prompt = [_distance_metrics(model_samples, baseline_samples, n_projections)]
         task_count = theta_pool.shape[0]
@@ -199,6 +201,7 @@ def compute_distribution_metrics(
             prompt_tokens=np.empty((1, 0), dtype=np.int64),
             step=step,
             prompt_source=prompt_source,
+            rollouts=rollout_tokens[None] if save_rollouts else None,
         )
         return per_prompt[0], per_prompt
 
@@ -214,9 +217,10 @@ def compute_distribution_metrics(
     posterior_alpha = np.empty((prompt_count, vocab_size))
     posterior_weights = np.empty((prompt_count, task_count))
     per_prompt: list[dict[str, float]] = []
+    rollout_stack: list[np.ndarray] = []
 
     for index, prompt in enumerate(prompts):
-        model_samples = predictive_monte_carlo_theta_chunked(
+        model_samples, rollout_tokens = predictive_monte_carlo_theta_chunked(
             model=model,
             vocab_size=vocab_size,
             forward_recursion_steps=effective_steps,
@@ -224,7 +228,9 @@ def compute_distribution_metrics(
             prompt=prompt.to(device),
             bos_token=bos_token,
             chunk_size=chunk_size,
+            save_rollouts=True,
         )
+        rollout_stack.append(rollout_tokens)
         references = baseline_samples[index]
         per_prompt.append(_distance_metrics(model_samples, references, n_projections))
         model_stack[index] = model_samples
@@ -247,6 +253,7 @@ def compute_distribution_metrics(
         prompt_tokens=prompts.numpy(),
         step=step,
         prompt_source=prompt_source,
+        rollouts=np.stack(rollout_stack, axis=0) if save_rollouts else None,
     )
     averaged = {
         key: float(np.mean([metrics[key] for metrics in per_prompt]))

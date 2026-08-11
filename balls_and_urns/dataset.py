@@ -10,6 +10,8 @@ from pathlib import Path
 
 import numpy as np
 
+from analysis.rollouts import rollout_bundle_path, save_rollout_bundle
+
 
 def save_generalising_dataset(
     path: Path,
@@ -77,6 +79,7 @@ def save_predictive_samples(
     prompt_tokens: np.ndarray,
     step: int,
     prompt_source: str,
+    rollouts: np.ndarray | None = None,
 ) -> None:
     n_prompts, _n_samples, vocab_size = model_samples.shape
     M = theta_pool.shape[0]
@@ -100,6 +103,11 @@ def save_predictive_samples(
     assert prompt_source in ("prior", "data_generalising", "data_memorising"), (
         f"bad prompt_source {prompt_source!r}"
     )
+    if rollouts is not None:
+        assert rollouts.shape[:2] == model_samples.shape[:2], (
+            f"rollout shape {rollouts.shape} does not match model samples "
+            f"{model_samples.shape}"
+        )
     path.parent.mkdir(parents=True, exist_ok=True)
     np.savez(
         path,
@@ -110,6 +118,13 @@ def save_predictive_samples(
         posterior_pool_weights=posterior_pool_weights,
         prior_dirichlet_alpha=prior_dirichlet_alpha,
         theta_pool=theta_pool,
+        prompt_tokens=prompt_tokens,
+        step=np.int64(step),
+        prompt_source=np.array(prompt_source),
+    )
+    save_rollout_bundle(
+        rollout_bundle_path(path),
+        {} if rollouts is None else {"rollout_tokens": rollouts},
         prompt_tokens=prompt_tokens,
         step=np.int64(step),
         prompt_source=np.array(prompt_source),

@@ -1,6 +1,7 @@
 k: 10
-seq_len: 1024
+seq_len: 256
 n_chains: 128
+context_len: 200
 batch_size: 128
 learning_rate: 0.0006
 eval_interval: 200

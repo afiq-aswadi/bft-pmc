@@ -34,7 +34,7 @@ class DynamicsConfig:
     compute_distribution: bool = True
     compute_prior_mode: bool = True
     n_samples: int = 100
-    predictive_steps: int = 256
+    predictive_steps: int = 223
     n_projections: int = 100
     chunk_size: int = 100
     alpha_value: float = 1.0
@@ -42,6 +42,7 @@ class DynamicsConfig:
     output_dir: str = "outputs/bau/distribution_dynamics"
     seed: int = 42
     device: str | None = None
+    save_rollouts: bool = True
 
     def validate(self) -> None:
         if not self.run_id:
@@ -170,6 +171,7 @@ def run_analysis(config: DynamicsConfig) -> tuple[pd.DataFrame, int, pd.DataFram
                     / f"step{step:08d}__source_{save_source}.npz",
                     step=step,
                     prompt_source=save_source,
+                    save_rollouts=config.save_rollouts,
                 )
                 suffix = "" if prompts is None else f"_from_prompts_{source}"
                 metrics.update(

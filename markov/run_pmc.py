@@ -19,10 +19,11 @@ class PMCConfig:
     checkpoint_path: Path
     config_path: Path = Path("markov/train.yaml")
     output_dir: Path = Path("outputs/markov/pmc")
-    num_samples: int = 128
-    generation_length: int = 400
-    prompt_len: int = 8
+    num_samples: int = 100
+    generation_length: int = 223
+    prompt_len: int = 32
     seed: int = 0
+    save_rollouts: bool = True
 
 
 def main(args: PMCConfig) -> None:
@@ -40,6 +41,7 @@ def main(args: PMCConfig) -> None:
             prompt_len=args.prompt_len,
             generation_length=args.generation_length,
             seed=args.seed,
+            save_rollouts=args.save_rollouts,
         ),
         output_dir=args.output_dir,
     )

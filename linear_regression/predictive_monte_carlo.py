@@ -54,8 +54,8 @@ def predictive_monte_carlo_beta(
     init_y: (
         Float[torch.Tensor, "K_init"] | Float[torch.Tensor, "n_prompts K_init"] | None
     ) = None,
-    save_y: bool = False,
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    save_rollouts: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Generate rollouts and estimate regression weights via least squares.
 
     Supports both single prompt and batched prompts. Each prompt gets
@@ -74,10 +74,13 @@ def predictive_monte_carlo_beta(
 
     Returns
     -------
-    np.ndarray or tuple[np.ndarray, np.ndarray]
+    np.ndarray or tuple[np.ndarray, np.ndarray, np.ndarray]
         - Single prompt or no prompt: (forward_recursion_samples, input_dim)
         - Batched prompts: (n_prompts, forward_recursion_samples, input_dim)
-        If save_y=True, also returns y values with matching batch structure.
+        If save_rollouts=True, also returns the (x, y) rollout pairs the
+        estimates were solved from, with shapes
+        (..., forward_recursion_samples, total_len, input_dim) and
+        (..., forward_recursion_samples, total_len).
     """
     if (init_x is None) != (init_y is None):
         raise ValueError("init_x and init_y must both be provided or both be None.")
@@ -134,15 +137,17 @@ def predictive_monte_carlo_beta(
     # shape: (n_prompts, forward_recursion_samples, input_dim)
 
     betas_np = beta_hat.detach().cpu().numpy()
+    xs_np = x_gen.detach().cpu().numpy()
     ys_np = y_gen.detach().cpu().numpy()
 
     # squeeze batch dim for single prompt / no prompt case
     if squeeze_output:
         betas_np = betas_np[0]
+        xs_np = xs_np[0]
         ys_np = ys_np[0]
 
-    if save_y:
-        return betas_np, ys_np
+    if save_rollouts:
+        return betas_np, xs_np, ys_np
     return betas_np
 
 
@@ -163,8 +168,8 @@ def predictive_monte_carlo_beta_chunked(
     init_y: (
         Float[torch.Tensor, "K_init"] | Float[torch.Tensor, "n_prompts K_init"] | None
     ) = None,
-    save_y: bool = False,
-) -> np.ndarray | tuple[np.ndarray, np.ndarray]:
+    save_rollouts: bool = False,
+) -> np.ndarray | tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run Predictive Monte Carlo in memory-friendly chunks.
 
     Chunks over the number of samples per prompt, not prompts.
@@ -183,10 +188,11 @@ def predictive_monte_carlo_beta_chunked(
 
     Returns
     -------
-    np.ndarray or tuple[np.ndarray, np.ndarray]
+    np.ndarray or tuple[np.ndarray, np.ndarray, np.ndarray]
         - Single prompt or no prompt: (forward_recursion_samples, input_dim)
         - Batched prompts: (n_prompts, forward_recursion_samples, input_dim)
-        If save_y=True, also returns y values with matching batch structure.
+        If save_rollouts=True, also returns the (x, y) rollout pairs with
+        matching batch structure.
     """
     assert chunk_size >= 1, "chunk_size must be positive"
     assert forward_recursion_samples >= 1, "forward_recursion_samples must be positive"
@@ -195,6 +201,7 @@ def predictive_monte_carlo_beta_chunked(
     single_prompt = init_x is None or init_x.dim() == 2
 
     all_betas: list[np.ndarray] = []
+    all_xs: list[np.ndarray] = []
     all_ys: list[np.ndarray] = []
 
     for start in range(0, forward_recursion_samples, chunk_size):
@@ -208,12 +215,13 @@ def predictive_monte_carlo_beta_chunked(
             temperature=temperature,
             init_x=init_x,
             init_y=init_y,
-            save_y=save_y,
+            save_rollouts=save_rollouts,
         )
 
-        if save_y:
-            betas_chunk, ys_chunk = result
+        if save_rollouts:
+            betas_chunk, xs_chunk, ys_chunk = result
             all_betas.append(betas_chunk)
+            all_xs.append(xs_chunk)
             all_ys.append(ys_chunk)
         else:
             assert isinstance(result, np.ndarray)
@@ -224,7 +232,8 @@ def predictive_monte_carlo_beta_chunked(
     # batched: chunks are (n_prompts, chunk_samples, input_dim), concat axis=1
     concat_axis = 0 if single_prompt else 1
     betas = np.concatenate(all_betas, axis=concat_axis)
-    if save_y:
+    if save_rollouts:
+        xs = np.concatenate(all_xs, axis=concat_axis)
         ys = np.concatenate(all_ys, axis=concat_axis)
-        return betas, ys
+        return betas, xs, ys
     return betas

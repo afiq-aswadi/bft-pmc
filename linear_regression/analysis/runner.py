@@ -12,6 +12,7 @@ import pandas as pd
 import torch
 from tqdm import tqdm
 
+from analysis.rollouts import save_samples_and_rollouts
 from linear_regression.likelihoods import linear_regression
 from linear_regression.priors import DiscretePrior
 from pfn_transformerlens import DeterministicGenerator, sample_batch
@@ -405,7 +406,15 @@ def run_analysis(
                             model_prepared=True,
                         )
                     )
-                    np.savez(samples_dir / f"T{num_tasks}_prior.npz", **dist_samples)
+                    save_samples_and_rollouts(
+                        samples_dir / f"T{num_tasks}_prior.npz",
+                        dist_samples,
+                        save_rollouts=config.save_rollouts,
+                        prompt_len=np.int64(0),
+                        prompt_source="N/A",
+                        num_tasks=np.int64(num_tasks),
+                        step=np.int64(checkpoint_step),
+                    )
                     row_base = {
                         "run_id": run_id,
                         "num_tasks": num_tasks,
@@ -450,13 +459,19 @@ def run_analysis(
                         prompt_data=prompt_data,
                     )
                 )
-                np.savez(
-                    samples_dir / f"T{num_tasks}_{source}_L{length}.npz", **dist_samples
-                )
                 source_for_csv = {
                     "discrete": "memorising",
                     "gaussian": "generalising",
                 }.get(source, source)
+                save_samples_and_rollouts(
+                    samples_dir / f"T{num_tasks}_{source}_L{length}.npz",
+                    dist_samples,
+                    save_rollouts=config.save_rollouts,
+                    prompt_len=np.int64(length),
+                    prompt_source=source_for_csv,
+                    num_tasks=np.int64(num_tasks),
+                    step=np.int64(checkpoint_step),
+                )
                 row_base = {
                     "run_id": run_id,
                     "num_tasks": num_tasks,
