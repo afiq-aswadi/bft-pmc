@@ -75,6 +75,10 @@ class SweepConfig:
     n_projections: int = 100
     chunk_size: int = 64
     seed: int = 0
+    # Evaluate every Nth checkpoint. The full set is one per 200 training steps
+    # (~500 per run), and each carries the whole PMC budget, so 1 makes the
+    # sweep a multi-day job. The final checkpoint is always included.
+    checkpoint_subsample: int = 1
     # Rollout state sequences go to <bundle>_rollouts.npz next to each sample
     # bundle; one bundle is written per checkpoint, so this is the bulk of the
     # analysis output.
@@ -95,6 +99,8 @@ class SweepConfig:
             raise ValueError("n_projections must be positive.")
         if self.chunk_size < 1:
             raise ValueError("chunk_size must be positive.")
+        if self.checkpoint_subsample < 1:
+            raise ValueError("checkpoint_subsample must be at least 1.")
 
 
 @dataclass(slots=True)
@@ -759,6 +765,12 @@ def _analyze_run(
     )
     if not checkpoint_paths:
         raise FileNotFoundError(f"No checkpoints found in {run_spec.checkpoint_dir}.")
+    # The sweep row is built from the last checkpoint evaluated, so keep it even
+    # when the stride would skip it.
+    selected_paths = checkpoint_paths[:: config.checkpoint_subsample]
+    if selected_paths[-1] != checkpoint_paths[-1]:
+        selected_paths.append(checkpoint_paths[-1])
+    checkpoint_paths = selected_paths
 
     run_seed = config.seed + 10_000 * artifacts.config.n_chains
     prior_references = _prepare_prior_reference_bundle(

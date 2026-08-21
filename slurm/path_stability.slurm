@@ -2,7 +2,7 @@
 # Path-stability (jellyfish) diagnostic over every sweep produced above.
 # Pure NumPy on saved rollouts: no GPU, no checkpoints, no regeneration.
 #
-#   sbatch --dependency=afterok:<lr_eval>:<bau_eval>:<markov_eval> slurm/path_stability.slurm
+#   sbatch --dependency=afterany:<lr_eval>:<bau_eval>:<markov_eval> slurm/path_stability.slurm
 #
 #SBATCH --job-name=bft-jellyfish
 #SBATCH --cpus-per-task=8

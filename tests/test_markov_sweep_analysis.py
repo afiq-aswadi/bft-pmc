@@ -51,6 +51,7 @@ def _fake_pmc(
         sweep.SweepConfig(generation_length=1),
         sweep.SweepConfig(n_projections=0),
         sweep.SweepConfig(chunk_size=0),
+        sweep.SweepConfig(checkpoint_subsample=0),
     ],
 )
 def test_markov_sweep_config_validation(config: sweep.SweepConfig) -> None:
@@ -395,6 +396,18 @@ def test_analyze_run_prior_and_posterior_paths(
         "M2_in_distribution_L2_rollouts.npz",
         "M2_out_of_distribution_L2_rollouts.npz",
     }
+
+    plotted.clear()
+    # a stride that would drop the final checkpoint must still evaluate it
+    subsampled_n_chains, subsampled_rows = sweep._analyze_run(
+        run_spec,
+        config=replace(config, checkpoint_subsample=2),
+        device=torch.device("cpu"),
+        runs_output_root=tmp_path / "subsampled_runs",
+        sweep_samples_dir=tmp_path / "subsampled_samples",
+    )
+    assert subsampled_n_chains == 2
+    assert int(pd.read_csv(tmp_path / "subsampled_runs/run/metrics.csv")["step"].max()) == 2
 
     plotted.clear()
     sweep._analyze_run(

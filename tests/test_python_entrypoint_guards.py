@@ -31,6 +31,7 @@ TYRO_ENTRYPOINTS = [
     "markov/task_diversity_threshold.py",
     "markov/train.py",
     "analysis/path_stability.py",
+    "analysis/pos_encoding_comparison.py",
     "sweeps/run_yaml_sweep.py",
 ]
 

@@ -70,7 +70,9 @@ MARKOV_EVAL=$(submit --job-name=bft-mk-eval --array=0-0 --time="${MARKOV_EVAL_TI
   --dependency="afterok:${MARKOV}" --export=ALL,FAMILY=markov slurm/analyse.slurm)
 
 echo "=== diagnostic (waits on all evaluations) ==="
-JELLYFISH=$(submit --dependency="afterok:${LR_EVAL}:${BAU_EVAL}:${MARKOV_EVAL}" \
+# afterany, not afterok: the diagnostic runs on whatever sample bundles exist,
+# so one failed evaluation should not sink the whole pipeline.
+JELLYFISH=$(submit --dependency="afterany:${LR_EVAL}:${BAU_EVAL}:${MARKOV_EVAL}" \
   slurm/path_stability.slurm)
 
 cat <<SUMMARY

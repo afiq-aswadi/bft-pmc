@@ -378,3 +378,12 @@ def test_lr_all_predictive_metrics_and_result_merging(
     merged = analysis_metrics.merge_results(predictive, distribution)
     assert merged.iloc[0]["mse"] == 1.0
     assert SweepConfig(noise_std=0.5).noise_variance == pytest.approx(0.25)
+
+
+def test_sweep_config_rejects_non_positive_chunking() -> None:
+    from linear_regression.analysis.config import SweepConfig
+
+    with pytest.raises(ValueError, match="chunk_size"):
+        SweepConfig(chunk_size=0).validate()
+    with pytest.raises(ValueError, match="chunk_size"):
+        SweepConfig(prompt_chunk_size=0).validate()

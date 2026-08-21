@@ -404,6 +404,7 @@ def run_analysis(
                             n_samples_prior=n_samples_prior,
                             n_prompts=0,
                             model_prepared=True,
+                            chunk_size=config.chunk_size,
                         )
                     )
                     save_samples_and_rollouts(
@@ -457,6 +458,8 @@ def run_analysis(
                         n_prompts=n_prompts,
                         model_prepared=True,
                         prompt_data=prompt_data,
+                        chunk_size=config.chunk_size,
+                        prompt_chunk_size=config.prompt_chunk_size,
                     )
                 )
                 source_for_csv = {

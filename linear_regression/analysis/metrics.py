@@ -156,6 +156,8 @@ def compute_distribution_metrics_single(
     n_prompts: int,
     model_prepared: bool = False,
     prompt_data: PromptData | None = None,
+    chunk_size: int = 100,
+    prompt_chunk_size: int | None = None,
 ) -> tuple[dict[str, float], dict[str, np.ndarray], list[dict[str, float]]]:
     """Compute ED and SW between the model's distribution and baselines."""
     if not model_prepared:
@@ -174,7 +176,7 @@ def compute_distribution_metrics_single(
             x_distribution=x_dist,
             forward_recursion_steps=predictive_steps,
             forward_recursion_samples=n_samples_prior,
-            chunk_size=100,
+            chunk_size=chunk_size,
             init_x=None,
             init_y=None,
             save_rollouts=True,
@@ -230,9 +232,10 @@ def compute_distribution_metrics_single(
             x_distribution=x_dist,
             forward_recursion_steps=predictive_steps,
             forward_recursion_samples=n_samples,
-            chunk_size=100,
+            chunk_size=chunk_size,
             init_x=all_xs_device,
             init_y=all_ys_device,
+            prompt_chunk_size=prompt_chunk_size,
             save_rollouts=True,
         )
 
@@ -333,7 +336,7 @@ def compute_distribution_metrics_single(
             x_distribution=x_dist,
             forward_recursion_steps=predictive_steps,
             forward_recursion_samples=n_samples,
-            chunk_size=100,
+            chunk_size=chunk_size,
             init_x=context_xs_device,
             init_y=context_ys_device,
             save_rollouts=True,

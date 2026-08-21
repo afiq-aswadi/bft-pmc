@@ -294,6 +294,33 @@ def test_predictive_monte_carlo_shapes_validation_and_chunking() -> None:
         chunk_size=2,
     ).shape == (3, 2)
 
+    # prompt-axis chunking must reproduce the unchunked batched result
+    torch.manual_seed(0)
+    reference = predictive_monte_carlo_beta_chunked(
+        model, normal, 2, 2, chunk_size=2,
+        init_x=prompt_x.repeat(4, 1, 1), init_y=prompt_y.repeat(4, 1),
+    )
+    torch.manual_seed(0)
+    prompt_blocked = predictive_monte_carlo_beta_chunked(
+        model, normal, 2, 2, chunk_size=2, prompt_chunk_size=2,
+        init_x=prompt_x.repeat(4, 1, 1), init_y=prompt_y.repeat(4, 1),
+    )
+    np.testing.assert_allclose(prompt_blocked, reference)
+    torch.manual_seed(0)
+    blocked, blocked_x, blocked_y = predictive_monte_carlo_beta_chunked(
+        model, normal, 2, 2, chunk_size=2, prompt_chunk_size=2,
+        init_x=prompt_x.repeat(4, 1, 1), init_y=prompt_y.repeat(4, 1),
+        save_rollouts=True,
+    )
+    assert blocked.shape == reference.shape == (4, 2, 2)
+    assert blocked_x.shape == (4, 2, 3, 2)
+    assert blocked_y.shape == (4, 2, 3)
+    with pytest.raises(AssertionError):
+        predictive_monte_carlo_beta_chunked(
+            model, normal, 2, 2, prompt_chunk_size=0,
+            init_x=prompt_x.repeat(2, 1, 1), init_y=prompt_y.repeat(2, 1),
+        )
+
     with pytest.raises(ValueError, match="both"):
         predictive_monte_carlo_beta(model, normal, 2, 2, init_x=prompt_x)
     with pytest.raises(AssertionError):

@@ -36,6 +36,11 @@ class SweepConfig:
     n_samples: tuple[int, ...] = (100,)  # rollouts per prompt (posterior mode)
     n_samples_prior: tuple[int, ...] = (1024,)  # rollouts for prior mode
     n_projections: int = 100  # for sliced Wasserstein
+    # PMC batching. model.generate expands prompts x samples into a single
+    # batch, so peak attention memory scales with their product; 4 x 100 = 400
+    # sequences fits a 16 GB card at 510 positions.
+    chunk_size: int = 100
+    prompt_chunk_size: int = 4
 
     # Rollouts run to the end of the trained context: 32 prompt observations
     # plus 223 generated ones fill the 256-observation window of every family.
@@ -92,5 +97,7 @@ class SweepConfig:
                 )
         if self.n_projections < 1 or self.predictive_steps < 1:
             raise ValueError("n_projections and predictive_steps must be positive.")
+        if self.chunk_size < 1 or self.prompt_chunk_size < 1:
+            raise ValueError("chunk_size and prompt_chunk_size must be positive.")
         if self.eval_n_prompts < 1 or self.eval_prompt_length < 1:
             raise ValueError("eval_n_prompts and eval_prompt_length must be positive.")

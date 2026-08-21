@@ -66,6 +66,8 @@ class DynamicsConfig:
     eval_dataset_dir: str | None = None
     device: str | None = None
     save_rollouts: bool = True
+    chunk_size: int = 100
+    prompt_chunk_size: int = 4
 
     @property
     def noise_variance(self) -> float:
@@ -107,6 +109,8 @@ def _to_sweep_config(config: DynamicsConfig) -> SweepConfig:
         eval_n_prompts=config.eval_n_prompts,
         eval_prompt_length=config.eval_prompt_length,
         eval_dataset_dir=config.eval_dataset_dir,
+        chunk_size=config.chunk_size,
+        prompt_chunk_size=config.prompt_chunk_size,
     )
 
 
@@ -205,6 +209,8 @@ def run_analysis(
                         n_prompts=config.n_prompts if config.prompt_length > 0 else 0,
                         model_prepared=True,
                         prompt_data=prompt_data,
+                        chunk_size=config.chunk_size,
+                        prompt_chunk_size=config.prompt_chunk_size,
                     )
                 )
                 suffix = (

@@ -168,12 +168,16 @@ def predictive_monte_carlo_beta_chunked(
     init_y: (
         Float[torch.Tensor, "K_init"] | Float[torch.Tensor, "n_prompts K_init"] | None
     ) = None,
+    prompt_chunk_size: int | None = None,
     save_rollouts: bool = False,
 ) -> np.ndarray | tuple[np.ndarray, np.ndarray, np.ndarray]:
     """Run Predictive Monte Carlo in memory-friendly chunks.
 
-    Chunks over the number of samples per prompt, not prompts.
-    Supports both single prompt and batched prompts.
+    ``model.generate`` expands batched prompts into ``n_prompts * samples``
+    sequences in one forward pass, so attention memory scales with the product.
+    ``chunk_size`` splits the sample axis and ``prompt_chunk_size`` the prompt
+    axis; the peak batch is their product. Leave ``prompt_chunk_size`` unset to
+    keep every prompt in one batch.
 
     Parameters
     ----------
@@ -199,6 +203,31 @@ def predictive_monte_carlo_beta_chunked(
 
     # detect if single prompt (will get 2D output from base function)
     single_prompt = init_x is None or init_x.dim() == 2
+
+    if not single_prompt and prompt_chunk_size is not None:
+        assert prompt_chunk_size >= 1, "prompt_chunk_size must be positive"
+        assert init_x is not None and init_y is not None
+        blocks = [
+            predictive_monte_carlo_beta_chunked(
+                model=model,
+                x_distribution=x_distribution,
+                forward_recursion_steps=forward_recursion_steps,
+                forward_recursion_samples=forward_recursion_samples,
+                chunk_size=chunk_size,
+                sample_y=sample_y,
+                temperature=temperature,
+                init_x=init_x[start : start + prompt_chunk_size],
+                init_y=init_y[start : start + prompt_chunk_size],
+                save_rollouts=save_rollouts,
+            )
+            for start in range(0, init_x.shape[0], prompt_chunk_size)
+        ]
+        if save_rollouts:
+            return tuple(
+                np.concatenate([block[index] for block in blocks], axis=0)
+                for index in range(3)
+            )
+        return np.concatenate(blocks, axis=0)
 
     all_betas: list[np.ndarray] = []
     all_xs: list[np.ndarray] = []
