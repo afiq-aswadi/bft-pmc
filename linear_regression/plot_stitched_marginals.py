@@ -25,6 +25,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+from analysis.rollouts import sample_bundles
 import tyro
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 from scipy.stats import norm
@@ -195,7 +197,7 @@ def main(
 
     # group: variant -> list[(M, data, is_prior)]
     groups: dict[str, list[tuple[int, dict, bool]]] = defaultdict(list)
-    for npz_path in sorted(samples_dir.glob("*.npz")):
+    for npz_path in sample_bundles(samples_dir):
         data = dict(np.load(npz_path))
         assert "pt" in data, f"{npz_path}: sample bundle is missing 'pt'"
         M, variant, is_prior = _parse_stem(npz_path.stem)

@@ -6,6 +6,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+from analysis.rollouts import sample_bundles
 import pandas as pd
 from scipy.stats import norm
 
@@ -454,7 +456,7 @@ def plot_results(df: pd.DataFrame, output_dir: Path, config: SweepConfig) -> Non
     if not samples_dir.exists():
         return
 
-    for npz_path in sorted(samples_dir.glob("*.npz")):
+    for npz_path in sample_bundles(samples_dir):
         with np.load(npz_path) as archive:
             data = dict(archive)
         if "pt" not in data:

@@ -6,8 +6,10 @@ import numpy as np
 
 from analysis.rollouts import (
     compact_token_array,
+    is_rollout_bundle,
     load_rollout_bundle,
     rollout_bundle_path,
+    sample_bundles,
     save_rollout_bundle,
     save_samples_and_rollouts,
     split_rollout_arrays,
@@ -18,6 +20,30 @@ def test_rollout_bundle_path_is_a_sibling_of_the_sample_bundle() -> None:
     assert rollout_bundle_path("outputs/samples/T8_prior.npz") == Path(
         "outputs/samples/T8_prior_rollouts.npz"
     )
+
+
+def test_sample_bundles_never_returns_the_rollout_sidecars(tmp_path: Path) -> None:
+    """Readers that expect sample keys must not be handed a rollout bundle.
+
+    The sidecars share the directory and the .npz extension, so a bare glob
+    picks them up and every marginal plotter fails on the missing schema.
+    """
+    for name in (
+        "T8_gaussian_L32.npz",
+        "T8_gaussian_L32_rollouts.npz",
+        "T64_prior.npz",
+        "T64_prior_rollouts.npz",
+    ):
+        (tmp_path / name).write_bytes(b"")
+
+    assert [path.name for path in sample_bundles(tmp_path)] == [
+        "T64_prior.npz",
+        "T8_gaussian_L32.npz",
+    ]
+    assert is_rollout_bundle("a/T8_prior_rollouts.npz")
+    assert not is_rollout_bundle("a/T8_prior.npz")
+    # a bundle whose stem merely mentions rollouts is still a sample bundle
+    assert not is_rollout_bundle("a/rollouts_summary.npz")
 
 
 def test_compact_token_array_picks_the_smallest_lossless_dtype() -> None:

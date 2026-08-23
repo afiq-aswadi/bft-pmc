@@ -19,12 +19,30 @@ import numpy as np
 
 
 ROLLOUT_PREFIX = "rollout_"
+ROLLOUT_SUFFIX = "_rollouts.npz"
 
 
 def rollout_bundle_path(samples_path: str | Path) -> Path:
     """Return the rollout-bundle path that belongs to a sample bundle."""
     path = Path(samples_path)
-    return path.with_name(f"{path.stem}_rollouts.npz")
+    return path.with_name(f"{path.stem}{ROLLOUT_SUFFIX}")
+
+
+def is_rollout_bundle(path: str | Path) -> bool:
+    """True for the sidecars written beside sample bundles."""
+    return Path(path).name.endswith(ROLLOUT_SUFFIX)
+
+
+def sample_bundles(samples_dir: str | Path) -> list[Path]:
+    """Every sample bundle in a directory, excluding the rollout sidecars.
+
+    The sidecars live in the same directory and share the ``.npz`` extension,
+    so a bare ``glob("*.npz")`` hands them to readers that expect sample keys
+    and fail on the schema. Every such reader should come through here.
+    """
+    return sorted(
+        path for path in Path(samples_dir).glob("*.npz") if not is_rollout_bundle(path)
+    )
 
 
 def compact_token_array(tokens: np.ndarray) -> np.ndarray:

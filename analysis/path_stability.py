@@ -25,8 +25,10 @@ trajectory starts at exactly zero.
 from __future__ import annotations
 
 import json
+import sys
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
+from zipfile import BadZipFile
 
 import matplotlib
 
@@ -246,9 +248,16 @@ def analyse_bundle(
     *,
     setup: str,
     stride: int = 1,
+    traces: RolloutTraces | None = None,
 ) -> SetupCurves:
-    """Compute the path-stability curves for one rollout bundle."""
-    traces = load_traces(path)
+    """Compute the path-stability curves for one rollout bundle.
+
+    Pass ``traces`` when the caller has already loaded the bundle; the file is
+    then opened exactly once, which matters when another job is writing to the
+    same sweep directory.
+    """
+    if traces is None:
+        traces = load_traces(path)
     grid = prefix_grid(traces.prompt_len, traces.total_len, stride)
     paths = theta_paths(traces, grid)
     distances = scaled_l1_paths(paths)
@@ -266,38 +275,74 @@ def analyse_bundle(
 
 
 def curves_to_frames(curves: list[SetupCurves]) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Convert curves to tidy (aggregate, per-prompt) tables."""
-    aggregate_rows: list[dict[str, object]] = []
-    per_prompt_rows: list[dict[str, object]] = []
+    """Convert curves to tidy (aggregate, per-prompt) tables.
+
+    Built column-wise rather than row-wise: a full sweep reaches millions of
+    per-prompt rows (setups x prefixes x prompts), and materialising that as a
+    list of dicts costs tens of gigabytes before pandas even sees it. Label
+    columns are categorical so they cost one code per row, not one Python
+    string object.
+    """
+    aggregate_frames: list[pd.DataFrame] = []
+    per_prompt_frames: list[pd.DataFrame] = []
     for curve in curves:
-        base = {
+        grid = np.asarray(curve.grid, dtype=np.int64)
+        prefixes = grid.size
+        n_prompts = int(curve.per_prompt.shape[0])
+        # "lr-rope/T64_gaussian_L32" -> input label "lr-rope", encoding "rope".
+        # Markov carries no encoding, so it labels itself.
+        input_label = curve.setup.split("/", 1)[0]
+        _, _, encoding = input_label.partition("-")
+        labels = {
             "setup": curve.setup,
             "family": curve.family,
+            "input_label": input_label,
+            "pos_encoding": encoding or input_label,
+            **{key: value for key, value in curve.metadata.items()},
+        }
+        numbers = {
             "prompt_len": curve.prompt_len,
             "p": int(curve.theta_reference.shape[-1]),
-            "n_prompts": int(curve.per_prompt.shape[0]),
-            **curve.metadata,
+            "n_prompts": n_prompts,
         }
-        for index, prefix in enumerate(curve.grid):
-            aggregate_rows.append(
+
+        aggregate = pd.DataFrame(
+            {
+                **{
+                    name: pd.Categorical([value] * prefixes)
+                    for name, value in labels.items()
+                },
+                **{name: np.full(prefixes, value) for name, value in numbers.items()},
+                "N": grid,
+                "T": grid - curve.prompt_len,
+                "scaled_l1": np.asarray(curve.expected, dtype=np.float64),
+            }
+        )
+        aggregate_frames.append(aggregate)
+
+        # prefix-major ordering, matching per_prompt[prompt, prefix]
+        total = prefixes * n_prompts
+        per_prompt_frames.append(
+            pd.DataFrame(
                 {
-                    **base,
-                    "N": int(prefix),
-                    "T": int(prefix) - curve.prompt_len,
-                    "scaled_l1": float(curve.expected[index]),
+                    **{
+                        name: pd.Categorical([value] * total)
+                        for name, value in labels.items()
+                    },
+                    **{name: np.full(total, value) for name, value in numbers.items()},
+                    "prompt_idx": np.tile(np.arange(n_prompts), prefixes),
+                    "N": np.repeat(grid, n_prompts),
+                    "T": np.repeat(grid - curve.prompt_len, n_prompts),
+                    "scaled_l1": np.asarray(curve.per_prompt, dtype=np.float64)
+                    .T.reshape(-1),
                 }
             )
-            for prompt_index in range(curve.per_prompt.shape[0]):
-                per_prompt_rows.append(
-                    {
-                        **base,
-                        "prompt_idx": prompt_index,
-                        "N": int(prefix),
-                        "T": int(prefix) - curve.prompt_len,
-                        "scaled_l1": float(curve.per_prompt[prompt_index, index]),
-                    }
-                )
-    return pd.DataFrame(aggregate_rows), pd.DataFrame(per_prompt_rows)
+        )
+
+    return (
+        pd.concat(aggregate_frames, ignore_index=True),
+        pd.concat(per_prompt_frames, ignore_index=True),
+    )
 
 
 def plot_path_stability(
@@ -330,6 +375,146 @@ def plot_path_stability(
     return output_path
 
 
+# Positional encodings keep one colour across every figure in the paper.
+ENCODING_COLOURS: dict[str, str] = {
+    "learned": "#1f77b4",
+    "rope": "#d62728",
+    "none": "#2ca02c",
+    "markov": "0.25",
+}
+# Markov has no positional-encoding variants, so it stays out of that legend.
+LEGEND_ENCODINGS = ("learned", "rope", "none")
+
+
+def plot_path_stability_by_family(
+    frame: pd.DataFrame,
+    save_path: str | Path,
+    *,
+    group_columns: tuple[str, ...] = ("setup",),
+    fig_width_in: float = 6.6,
+    print_frac: float = 0.6,
+    ylims: dict[str, tuple[float, float]] | None = None,
+    colour: str | None = None,
+) -> Path:
+    """One panel per family, trajectories coloured by positional encoding.
+
+    Pass ``colour`` to override that and draw every curve in one shade, which
+    is what the per-encoding figures want: each file holds a single encoding,
+    so hue carries no information there.
+
+    The single-axes version above reproduces TabMGP Figure 3, which draws one
+    dataset per panel. Overlaying three families and three encodings there
+    leaves every curve the same grey and nothing attributable, so this is the
+    figure to read when comparing setups.
+    """
+    if frame.empty:
+        raise ValueError("No trajectories to plot.")
+    families = [str(name) for name in pd.unique(frame["family"])]
+    apply_paper_style(fig_width_in, print_frac)
+    # Not sharey: BAU peaks near 0.08 and Markov near 0.05, so a shared axis
+    # scaled to LR's 1.0 flattens both into the baseline.
+    figure, axes_grid = plt.subplots(
+        1,
+        len(families),
+        figsize=(fig_width_in, fig_width_in * 0.34),
+        sharex=True,
+        sharey=False,
+        squeeze=False,
+    )
+    seen: dict[str, str] = {}
+    for axes, family in zip(axes_grid[0], families):
+        subset = frame[frame["family"] == family]
+        for _, group in subset.groupby(list(group_columns), observed=True):
+            encoding = str(group["pos_encoding"].iloc[0])
+            line_colour = colour or ENCODING_COLOURS.get(encoding, "0.25")
+            seen[encoding] = line_colour
+            ordered = group.sort_values("T")
+            axes.plot(
+                ordered["T"],
+                ordered["scaled_l1"],
+                color=line_colour,
+                linewidth=0.7,
+                alpha=0.75,
+            )
+        axes.set_title(family)
+        axes.set_xlabel("N - n")
+        axes.spines["top"].set_visible(False)
+        axes.spines["right"].set_visible(False)
+        axes.set_xlim(left=0)
+        if ylims is not None and family in ylims:
+            axes.set_ylim(*ylims[family])
+        else:
+            axes.set_ylim(bottom=0)
+    axes_grid[0][0].set_ylabel("Scaled $L_1$")
+    handles = [
+        plt.Line2D([], [], color=seen[name], linewidth=1.2, label=name)
+        for name in LEGEND_ENCODINGS
+        if name in seen
+    ]
+    figure.tight_layout()
+    if handles:
+        # Anchored to the figure's bottom edge and drawn downwards, so it can
+        # never land on the tick labels or the x-axis titles.
+        figure.legend(
+            handles=handles,
+            loc="upper center",
+            ncol=len(handles),
+            frameon=False,
+            bbox_to_anchor=(0.5, 0.0),
+        )
+    output_path = Path(save_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    figure.savefig(output_path, bbox_inches="tight")
+    figure.savefig(output_path.with_suffix(".pdf"), bbox_inches="tight")
+    plt.close(figure)
+    return output_path
+
+
+def family_ylims(frame: pd.DataFrame) -> dict[str, tuple[float, float]]:
+    """Per-family y-limits taken across every encoding in the frame."""
+    limits: dict[str, tuple[float, float]] = {}
+    for family, subset in frame.groupby("family", observed=True):
+        top = float(subset["scaled_l1"].max()) * 1.05
+        limits[str(family)] = (0.0, top if top > 0 else 1.0)
+    return limits
+
+
+def plot_path_stability_per_encoding(
+    frame: pd.DataFrame,
+    output_dir: str | Path,
+    *,
+    group_columns: tuple[str, ...] = ("setup",),
+    stem: str = "path_stability",
+    fig_width_in: float = 6.6,
+    print_frac: float = 0.6,
+    colour: str = "black",
+) -> list[Path]:
+    """A standalone figure per positional encoding, one panel per family.
+
+    The y-limit for each family is computed once across *all* encodings and
+    reused in every file. Letting each figure autoscale would make `rope` and
+    `none` look alike no matter how far apart their drift actually is.
+    """
+    if frame.empty:
+        raise ValueError("No trajectories to plot.")
+    output_dir = Path(output_dir)
+    limits = family_ylims(frame)
+    written: list[Path] = []
+    for encoding in [str(name) for name in pd.unique(frame["pos_encoding"])]:
+        written.append(
+            plot_path_stability_by_family(
+                frame[frame["pos_encoding"] == encoding],
+                output_dir / f"{stem}_{encoding}.png",
+                group_columns=group_columns,
+                fig_width_in=fig_width_in,
+                print_frac=print_frac,
+                ylims=limits,
+                colour=colour,
+            )
+        )
+    return written
+
+
 def discover_bundles(root: str | Path) -> list[Path]:
     """Every rollout bundle under a directory, or the file itself."""
     path = Path(root)
@@ -354,8 +539,11 @@ class PathStabilityConfig:
     output_dir: str = "outputs/path_stability"
     # Evaluate theta every `stride` observations; 1 reproduces the paper exactly.
     stride: int = 1
-    # Draw one line per prompt (TabMGP Figure 8) instead of per setup (Figure 3).
-    per_prompt_curves: bool = False
+    # How many single-dataset trajectories to draw per setup. TabMGP computes the
+    # diagnostic from one realisation of z_{1:n} (Figure 3) and from 20 of them
+    # (Figure 8); 0 instead averages over every prompt, which is a different
+    # estimand -- the mean over observed datasets rather than one analyst's view.
+    realisations: int = 0
 
     def validate(self) -> None:
         if not self.inputs:
@@ -365,18 +553,30 @@ class PathStabilityConfig:
             )
         if self.stride < 1:
             raise ValueError("stride must be positive.")
+        if self.realisations < 0:
+            raise ValueError("realisations must not be negative.")
 
 
 def collect_curves(config: PathStabilityConfig) -> list[SetupCurves]:
     """Analyse every posterior rollout bundle reachable from the inputs."""
     curves: list[SetupCurves] = []
+    skipped: list[str] = []
     for entry in config.inputs:
         label, root = parse_input(entry)
         bundles = discover_bundles(root)
         if not bundles:
             raise FileNotFoundError(f"No *_rollouts.npz bundles under {root}.")
         for bundle in bundles:
-            traces = load_traces(bundle)
+            try:
+                traces = load_traces(bundle)
+            except (FileNotFoundError, BadZipFile, EOFError) as error:
+                # Sweeps are routinely still being written, or cleaned up, while
+                # this runs: paths are listed up front but opened much later. One
+                # unreadable bundle is not worth discarding hours of analysis, so
+                # record it loudly and carry on.
+                skipped.append(f"{bundle}: {error}")
+                print(f"[path-stability] skipping {skipped[-1]}", file=sys.stderr)
+                continue
             if traces.prompt_len < 1:
                 # Prior rollouts have no observed data, so theta(F_n) is undefined.
                 continue
@@ -385,12 +585,19 @@ def collect_curves(config: PathStabilityConfig) -> list[SetupCurves]:
                     bundle,
                     setup=f"{label}/{bundle.name.removesuffix('_rollouts.npz')}",
                     stride=config.stride,
+                    traces=traces,
                 )
             )
+    if skipped:
+        print(
+            f"[path-stability] {len(skipped)} bundle(s) were unreadable and are "
+            "missing from the figure.",
+            file=sys.stderr,
+        )
     if not curves:
         raise RuntimeError(
-            "Every bundle was prior-mode; the diagnostic needs posterior rollouts "
-            "with a non-empty prompt."
+            "No usable bundles: every one was prior-mode or unreadable. The "
+            "diagnostic needs posterior rollouts with a non-empty prompt."
         )
     return curves
 
@@ -415,13 +622,23 @@ def main(config: PathStabilityConfig) -> None:
         references[f"{curve.setup}::grid"] = curve.grid
     np.savez_compressed(output_dir / "theta_reference.npz", **references)
 
-    frame = per_prompt if config.per_prompt_curves else aggregate
-    groups = ("setup", "prompt_idx") if config.per_prompt_curves else ("setup",)
+    if config.realisations:
+        frame = per_prompt[per_prompt["prompt_idx"] < config.realisations]
+        groups = ("setup", "prompt_idx")
+    else:
+        frame = aggregate
+        groups = ("setup",)
     plot_path_stability(
         frame,
         output_dir / "path_stability.png",
         group_columns=groups,
     )
+    plot_path_stability_by_family(
+        frame,
+        output_dir / "path_stability_by_family.png",
+        group_columns=groups,
+    )
+    plot_path_stability_per_encoding(frame, output_dir, group_columns=groups)
 
 
 if __name__ == "__main__":

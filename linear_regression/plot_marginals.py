@@ -19,6 +19,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+from analysis.rollouts import sample_bundles
 import tyro
 from scipy.stats import norm
 
@@ -223,7 +225,7 @@ def main(
     )
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    npz_paths = sorted(samples_dir.glob("*.npz"))
+    npz_paths = sample_bundles(samples_dir)
     assert npz_paths, f"no .npz files under {samples_dir}"
 
     prefix = f"grid_marginal_{num_dims}dim_" if num_dims else "grid_marginal_"

@@ -387,3 +387,19 @@ def test_sweep_config_rejects_non_positive_chunking() -> None:
         SweepConfig(chunk_size=0).validate()
     with pytest.raises(ValueError, match="chunk_size"):
         SweepConfig(prompt_chunk_size=0).validate()
+
+
+def test_dmmse_weights_survive_a_long_out_of_distribution_prompt() -> None:
+    """Float32 log-likelihoods of magnitude ~1e3 left the sum ~1e-5 off one."""
+    torch.manual_seed(0)
+    prior = DiscretePrior(task_size=8, num_tasks=32)
+    # 32 observations drawn from a task far outside the pool: residuals are large,
+    # so the log-likelihoods are large-magnitude and precision matters.
+    xs = torch.randn(32, 8)
+    ys = xs @ torch.full((8,), 25.0) + torch.randn(32)
+
+    weights = analysis_metrics.compute_dmmse_weights(xs, ys, prior, 0.25)
+    assert weights.dtype == np.float64
+    assert (weights >= 0).all()
+    # the plotters validate with atol=1e-6; double precision clears it by orders
+    assert abs(weights.sum() - 1.0) < 1e-12

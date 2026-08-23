@@ -2,8 +2,10 @@
 
 Reads npz bundles from `outputs/markov/sweep_analysis/samples/`:
   - M{n}_prior.npz                       single empty-prompt prior
-  - M{n}_in_distribution_L8.npz          16 ID prompts x 128 PMC samples
-  - M{n}_out_of_distribution_L8.npz      16 OOD prompts x 128 PMC samples
+  - M{n}_in_distribution_L{len}.npz      ID prompts x PMC samples
+  - M{n}_out_of_distribution_L{len}.npz  OOD prompts x PMC samples
+
+``--prompt-length`` selects {len}: the 2026-08 sweeps use 32, earlier runs 8.
 
 For each M and each (prior, posterior_id, posterior_ood), writes one density and
 one CDF figure. For posteriors we pick a single representative prompt index.
@@ -59,10 +61,11 @@ def _process_run(
     max_classes: int | None,
     dpi: int = 400,
     print_frac: float = 0.95,
+    prompt_length: int = 8,
 ) -> None:
     prior_path = samples_dir / f"M{n_chains}_prior.npz"
-    id_path = samples_dir / f"M{n_chains}_in_distribution_L8.npz"
-    ood_path = samples_dir / f"M{n_chains}_out_of_distribution_L8.npz"
+    id_path = samples_dir / f"M{n_chains}_in_distribution_L{prompt_length}.npz"
+    ood_path = samples_dir / f"M{n_chains}_out_of_distribution_L{prompt_length}.npz"
 
     missing_paths = [
         path for path in (prior_path, id_path, ood_path) if not path.is_file()
@@ -144,6 +147,13 @@ def main() -> None:
         help="Specific n_chains values; default = all M*_prior.npz found.",
     )
     parser.add_argument("--prompt-index", type=int, default=0)
+    parser.add_argument(
+        "--prompt-length",
+        type=int,
+        default=8,
+        help="Prompt length in the sample filenames (M{n}_..._L{len}.npz). "
+        "The 2026-08 sweeps use 32; earlier runs used 8.",
+    )
     parser.add_argument("--panel-size", type=float, default=1.4)
     parser.add_argument(
         "--max-classes",
@@ -192,6 +202,7 @@ def main() -> None:
             max_classes=args.max_classes,
             dpi=args.dpi,
             print_frac=args.print_frac,
+            prompt_length=args.prompt_length,
         )
 
 

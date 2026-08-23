@@ -25,6 +25,8 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+
+from analysis.rollouts import sample_bundles
 import tyro
 from matplotlib.ticker import FormatStrFormatter, MaxNLocator
 from scipy.stats import beta as beta_dist
@@ -186,7 +188,7 @@ def main(
     out_dir.mkdir(parents=True, exist_ok=True)
 
     groups: dict[str, list[tuple[int, dict]]] = defaultdict(list)
-    for npz_path in sorted(samples_dir.glob("*.npz")):
+    for npz_path in sample_bundles(samples_dir):
         data = load_predictive_samples(npz_path)
         source = str(data["prompt_source"])
         M = int(data["theta_pool"].shape[0])

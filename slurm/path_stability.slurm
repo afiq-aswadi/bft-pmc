@@ -6,7 +6,11 @@
 #
 #SBATCH --job-name=bft-jellyfish
 #SBATCH --cpus-per-task=8
-#SBATCH --mem=64G
+# Sized from measurement, not estimate: job 59365675 peaked at 84.7G of MaxRSS
+# over 131 LR bundles (64G had already died in curves_to_frames before the
+# tables were made columnar). A full three-encoding sweep carries ~204 LR
+# bundles, so this leaves headroom in case the peak tracks bundle count.
+#SBATCH --mem=200G
 #SBATCH --time=04:00:00
 #SBATCH --output=logs/%x_%j.out
 #SBATCH --error=logs/%x_%j.err

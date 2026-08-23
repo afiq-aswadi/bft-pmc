@@ -94,9 +94,17 @@ def compute_dmmse_weights(
     prior: DiscretePrior,
     noise_variance: float,
 ) -> np.ndarray:
-    """Closed-form discrete posterior weights over `prior.tasks`. Shape (M,), sums to 1."""
-    tasks = prior.tasks
-    xs, ys = xs.to(tasks.device), ys.to(tasks.device)
+    """Closed-form discrete posterior weights over `prior.tasks`. Shape (M,), sums to 1.
+
+    Computed in double precision: a long out-of-distribution prompt drives the
+    log-likelihoods to magnitudes around 1e3, where float32 resolves only ~1e-4
+    absolutely. That error survives the log-sum-exp shift and becomes relative
+    error on every weight, leaving the sum ~1e-5 away from one — enough to fail
+    the marginal plotters' validation.
+    """
+    tasks = prior.tasks.double()
+    xs = xs.to(device=tasks.device, dtype=torch.float64)
+    ys = ys.to(device=tasks.device, dtype=torch.float64)
     residuals = ys.unsqueeze(0) - torch.einsum("kd,sd->ks", tasks, xs)
     log_likelihoods = -0.5 * (residuals**2).sum(dim=1) / noise_variance
     log_probs = log_likelihoods - log_likelihoods.logsumexp(dim=0)
