@@ -223,3 +223,23 @@ def test_dynamics_main_writes_artifacts(
         )
     )
     assert len(plotted) == 3
+
+
+def test_subsample_checkpoints_keeps_the_last_whatever_the_stride() -> None:
+    """The stride trades x-axis resolution; it must not move the end point."""
+    paths = [Path(f"checkpoint_step_{step}.pt") for step in (0, 1, 5, 500, 1000)]
+
+    assert dynamics.subsample_checkpoints(paths, 1) == paths
+    # indices 0, 2, 4 -- the last is already included
+    assert [p.stem for p in dynamics.subsample_checkpoints(paths, 2)] == [
+        "checkpoint_step_0",
+        "checkpoint_step_5",
+        "checkpoint_step_1000",
+    ]
+    # indices 0, 3 -- the final checkpoint is appended back
+    assert [p.stem for p in dynamics.subsample_checkpoints(paths, 3)] == [
+        "checkpoint_step_0",
+        "checkpoint_step_500",
+        "checkpoint_step_1000",
+    ]
+    assert dynamics.subsample_checkpoints([], 5) == []

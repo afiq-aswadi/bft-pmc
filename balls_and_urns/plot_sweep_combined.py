@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tyro
 
-from plotting.paper_style import apply_paper_style
+from plotting.paper_style import apply_paper_style, task_diversity_ticks
 
 
 @dataclass
@@ -37,6 +37,7 @@ def style_ax(
     symlog_thresh: float | None = None,
 ) -> None:
     ax.set_xscale("log", base=2)
+    task_diversity_ticks(ax.xaxis)
     if symlog_thresh is not None:
         ax.set_yscale("symlog", linthresh=symlog_thresh)
     elif log_scale:
@@ -115,7 +116,7 @@ def main(config: PlotConfig) -> None:
                 sharey="col",
             )
             row_labels = ["In-distribution", "Out-of-distribution"]
-            ylabels = ["Symmetrized KL", "Energy distance", "Sliced Wasserstein"][
+            ylabels = ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"][
                 :n_cols
             ]
 

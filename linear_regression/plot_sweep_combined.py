@@ -23,7 +23,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tyro
 
-from plotting.paper_style import apply_paper_style
+from plotting.paper_style import apply_paper_style, task_diversity_ticks
 
 
 @dataclass
@@ -45,6 +45,7 @@ SERIES_PRIOR = [
 
 def style_ax(ax: plt.Axes, ylabel: str | None = None) -> None:
     ax.set_xscale("log", base=2)
+    task_diversity_ticks(ax.xaxis)
     ax.set_yscale("log")
     ax.set_xlabel(r"$M$")
     if ylabel:

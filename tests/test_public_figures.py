@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+from dataclasses import replace
 from pathlib import Path
 import sys
 
@@ -319,6 +321,7 @@ def test_markov_aggregate_plot_edge_paths(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     saved_figures: list[Path],
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     metrics = pd.DataFrame(
         {
@@ -367,11 +370,48 @@ def test_markov_aggregate_plot_edge_paths(
     with pytest.raises(ValueError, match="cannot parse n_chains"):
         markov_sweep._build_rows(malformed_root, metrics_csv)
 
+    # A run with no KL history is a supported state, not an error: the 2026-08
+    # sweeps never wrote wandb_kl_history.csv, so KL reads as NaN and the
+    # figure drops that column rather than failing.
     missing_root = tmp_path / "missing_history"
     missing_root.mkdir()
     (missing_root / "run_chains2").mkdir()
-    with pytest.raises(FileNotFoundError):
-        markov_sweep._build_rows(missing_root, metrics_csv)
+    rows = markov_sweep._build_rows(missing_root, metrics_csv)
+    assert math.isnan(rows["in_distribution"][0].kl_vs_memorising)
+    assert not math.isnan(rows["in_distribution"][0].ed_vs_memorising)
+
+    panels = markov_sweep.available_panels(rows)
+    assert [label for label, _, _ in panels] == [
+        "Energy distance",
+        "Sliced Wasserstein",
+    ]
+
+    # end to end: the figure is produced with the KL column dropped, and says so
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_sweep_combined.py",
+            "--runs-dir",
+            str(missing_root),
+            "--metrics-csv",
+            str(metrics_csv),
+            "--out-path",
+            str(tmp_path / "no_kl" / "markov_sweep.png"),
+        ],
+    )
+    markov_sweep.main()
+    assert "no data for Symmetrised KL" in capsys.readouterr().err
+    # two metrics left, so only the full layout is emitted -- no narrower twin
+    no_kl = [path for path in saved_figures if path.parent.name == "no_kl"]
+    assert [path.name for path in no_kl] == ["markov_sweep.png"]
+    # with KL present, all three panels are offered
+    with_kl = {
+        "in_distribution": [
+            replace(rows["in_distribution"][0], kl_vs_memorising=0.5),
+        ],
+    }
+    assert len(markov_sweep.available_panels(with_kl)) == 3
 
     run_dir = tmp_path / "run_chains2"
     run_dir.mkdir()
@@ -398,7 +438,8 @@ def test_markov_aggregate_plot_edge_paths(
         }
     ).to_csv(run_dir / "wandb_kl_history.csv", index=False)
     markov_dynamics._process_run(run_dir, tmp_path, n_chains=2)
-    assert len(saved_figures) == 2
+    # two dynamics grids here, plus the one KL-less sweep figure drawn above
+    assert len(saved_figures) == 3
 
     monkeypatch.setattr(
         sys,

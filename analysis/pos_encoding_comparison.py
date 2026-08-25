@@ -34,7 +34,7 @@ import pandas as pd
 import tyro
 
 from analysis.path_stability import parse_input
-from plotting.paper_style import apply_paper_style
+from plotting.paper_style import apply_paper_style, task_diversity_ticks
 
 
 # One curve per encoding, in the order they are reported.
@@ -213,6 +213,7 @@ def plot_metric_panels(
                 linewidth=1.0,
             )
         axis.set_xscale("log", base=2)
+        task_diversity_ticks(axis.xaxis)
         axis.set_title(column.split("/")[-1], fontsize="small")
         axis.set_xlabel("M")
         axis.spines["top"].set_visible(False)

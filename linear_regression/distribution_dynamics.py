@@ -67,6 +67,10 @@ class DynamicsConfig:
     device: str | None = None
     save_rollouts: bool = True
     chunk_size: int = 100
+    # Evaluate every Nth checkpoint. The dense-early schedule saves several
+    # hundred per run and each one costs a full PMC evaluation, so this is the
+    # dial for run time; it trades x-axis resolution, not experimental setup.
+    checkpoint_subsample: int = 1
     prompt_chunk_size: int = 4
 
     @property
@@ -78,7 +82,13 @@ class DynamicsConfig:
             raise ValueError("run_id must be provided.")
         if self.prompt_length < 0:
             raise ValueError("prompt_length must be non-negative.")
-        for name in ["n_samples", "n_prompts", "predictive_steps", "n_projections"]:
+        for name in [
+            "n_samples",
+            "n_prompts",
+            "predictive_steps",
+            "n_projections",
+            "checkpoint_subsample",
+        ]:
             if getattr(self, name) < 1:
                 raise ValueError(f"{name} must be positive.")
         if self.eval_batch_size < 1 or self.eval_seq_len < 1:
@@ -120,6 +130,20 @@ def _resolve_device(config: DynamicsConfig) -> torch.device:
     return torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+def subsample_checkpoints(checkpoints: list[Path], stride: int) -> list[Path]:
+    """Every ``stride``-th checkpoint, always including the last.
+
+    Each checkpoint costs a full PMC evaluation, and the dense-early schedule
+    saves several hundred per run, so this is the dial for run time. Keeping
+    the final checkpoint regardless of stride means the last point of the
+    dynamics curve is the same model the task-diversity sweep reports.
+    """
+    selected = checkpoints[::stride]
+    if selected and selected[-1] != checkpoints[-1]:
+        selected.append(checkpoints[-1])
+    return selected
+
+
 def run_analysis(
     config: DynamicsConfig,
     samples_dir: Path | None = None,
@@ -132,6 +156,7 @@ def run_analysis(
     checkpoints = find_all_checkpoints(run_dir)
     if not checkpoints:
         raise RuntimeError(f"No checkpoints found in {run_dir}")
+    checkpoints = subsample_checkpoints(checkpoints, config.checkpoint_subsample)
 
     device = _resolve_device(config)
     first_info = load_run_info(checkpoints[0], device=device)

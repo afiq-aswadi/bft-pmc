@@ -5,6 +5,8 @@ from __future__ import annotations
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+
+from plotting.paper_style import task_diversity_ticks
 import numpy as np
 
 from analysis.rollouts import sample_bundles
@@ -34,6 +36,7 @@ def _style_axis(
     log_y: bool = False,
 ) -> None:
     ax.set_xscale("log", base=2)
+    task_diversity_ticks(ax.xaxis)
     if log_y:
         ax.set_yscale("symlog", linthresh=0.001)
     ax.set_xlabel(xlabel)

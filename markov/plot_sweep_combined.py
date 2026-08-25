@@ -17,6 +17,8 @@ Layout matches the linear-regression and balls-and-urns sweep figures.
 from __future__ import annotations
 
 import argparse
+import math
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -24,7 +26,9 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from plotting.paper_style import apply_paper_style
+from markov.kl_history import load_kl_history
+from markov.run_names import parse_n_chains
+from plotting.paper_style import apply_paper_style, task_diversity_ticks
 
 
 SERIES = [
@@ -44,9 +48,35 @@ class SweepRow:
     sw_vs_generalising: float
 
 
-def _last_step_kl(wandb_csv: Path, source: str) -> tuple[float, float]:
-    """Return last-step (memorising_kl, generalising_kl) for a run, using wellspec."""
-    df = pd.read_csv(wandb_csv).sort_values("step")
+
+ALL_PANELS: tuple[tuple[str, str, str], ...] = (
+    ("Symmetrised KL", "kl_vs_memorising", "kl_vs_generalising"),
+    ("Energy distance", "ed_vs_memorising", "ed_vs_generalising"),
+    ("Sliced Wasserstein", "sw_vs_memorising", "sw_vs_generalising"),
+)
+
+
+def available_panels(
+    rows_by_source: dict[str, list[SweepRow]],
+) -> list[tuple[str, str, str]]:
+    """Panels whose metric is present in at least one row."""
+    every_row = [row for rows in rows_by_source.values() for row in rows]
+    return [
+        spec
+        for spec in ALL_PANELS
+        if any(not math.isnan(getattr(row, spec[1])) for row in every_row)
+    ]
+
+
+def _last_step_kl(history: pd.DataFrame | None, source: str) -> tuple[float, float]:
+    """Last-step (memorising_kl, generalising_kl) for a run, using wellspec.
+
+    Returns NaNs when neither KL source exists, so the figure drops that column
+    rather than failing. See :mod:`markov.kl_history` for the two sources.
+    """
+    if history is None:
+        return (float("nan"), float("nan"))
+    df = history
     src = "id" if source == "in_distribution" else "ood"
     last = df.iloc[-1]
     return (
@@ -55,7 +85,9 @@ def _last_step_kl(wandb_csv: Path, source: str) -> tuple[float, float]:
     )
 
 
-def _build_rows(runs_dir: Path, metrics_csv: Path) -> dict[str, list[SweepRow]]:
+def _build_rows(
+    runs_dir: Path, metrics_csv: Path, training_root: Path | None = None
+) -> dict[str, list[SweepRow]]:
     metrics = pd.read_csv(metrics_csv)
     metrics["n_chains"] = metrics["n_chains"].astype(int)
 
@@ -66,18 +98,11 @@ def _build_rows(runs_dir: Path, metrics_csv: Path) -> dict[str, list[SweepRow]]:
         "out_of_distribution": [],
     }
     for run_dir in run_dirs:
-        token = next(
-            (t for t in run_dir.name.split("_") if t.startswith("chains")), None
-        )
-        if token is None:
-            raise ValueError(
-                f"cannot parse n_chains from run directory {run_dir.name!r}"
-            )
-        n = int(token.removeprefix("chains"))
-        wandb_csv = run_dir / "wandb_kl_history.csv"
+        n = parse_n_chains(run_dir.name)
+        history = load_kl_history(run_dir, training_root=training_root)
 
         for source in ("in_distribution", "out_of_distribution"):
-            kl_mem, kl_gen = _last_step_kl(wandb_csv, source)
+            kl_mem, kl_gen = _last_step_kl(history, source)
 
             mask = (metrics["n_chains"] == n) & (metrics["prompt_source"] == source)
             sub = metrics[mask]
@@ -110,6 +135,7 @@ def _build_rows(runs_dir: Path, metrics_csv: Path) -> dict[str, list[SweepRow]]:
 
 def _style_ax(ax: plt.Axes, ylabel: str | None = None) -> None:
     ax.set_xscale("log", base=2)
+    task_diversity_ticks(ax.xaxis)
     ax.set_yscale("log")
     ax.set_xlabel(r"$M$")
     if ylabel:
@@ -155,46 +181,53 @@ def main() -> None:
         type=Path,
         default=Path("outputs/markov/sweep_analysis/sweep_combined_with_kl.png"),
     )
+    parser.add_argument(
+        "--training-root",
+        type=Path,
+        default=None,
+        help="Root holding <run>/training_log.csv; used when a run has no "
+        "wandb_kl_history.csv. Default: outputs/markov/training.",
+    )
     args = parser.parse_args()
 
-    rows_by_source = _build_rows(args.runs_dir, args.metrics_csv)
+    rows_by_source = _build_rows(args.runs_dir, args.metrics_csv, args.training_root)
 
-    # Emit both layouts: 2x3 (KL, ED, SW) preserves the historical figure;
-    # 2x2 (KL, ED) drops SW for the paper-ready version.
+    panels = available_panels(rows_by_source)
+    if len(panels) < len(ALL_PANELS):
+        missing = [spec[0] for spec in ALL_PANELS if spec not in panels]
+        print(
+            f"[markov-sweep] no data for {', '.join(missing)}; "
+            f"emitting {len(panels)} columns instead of {len(ALL_PANELS)}.",
+            file=sys.stderr,
+        )
+
+    # Emit the full figure and, when there is a column to spare, the narrower
+    # paper-ready twin that drops the last metric.
     args.out_path.parent.mkdir(parents=True, exist_ok=True)
-    for layout, suffix in [("2x3", ""), ("2x2", "_2x2")]:
-        n_cols = 3 if layout == "2x3" else 2
+    layouts = [(len(panels), "")]
+    if len(panels) > 2:
+        layouts.append((len(panels) - 1, "_2x2"))
+
+    for n_cols, suffix in layouts:
         apply_paper_style(4.2 * n_cols, 0.49 if n_cols == 2 else 0.95)
         fig, axes = plt.subplots(
             2, n_cols, figsize=(4.2 * n_cols, 6.2), constrained_layout=True, sharey="col"
         )
 
         row_labels = ["In-distribution", "Out-of-distribution"]
-        ylabels = ["Symmetrized KL", "Energy distance", "Sliced Wasserstein"][:n_cols]
+        shown = panels[:n_cols]
 
         for row_idx, source in enumerate(("in_distribution", "out_of_distribution")):
             rows = rows_by_source[source]
-            _plot_panel(
-                axes[row_idx, 0],
-                rows,
-                mem_attr="kl_vs_memorising",
-                gen_attr="kl_vs_generalising",
-            )
-            _plot_panel(
-                axes[row_idx, 1],
-                rows,
-                mem_attr="ed_vs_memorising",
-                gen_attr="ed_vs_generalising",
-            )
-            if n_cols == 3:
+            for col_idx, (_, mem_attr, gen_attr) in enumerate(shown):
                 _plot_panel(
-                    axes[row_idx, 2],
+                    axes[row_idx, col_idx],
                     rows,
-                    mem_attr="sw_vs_memorising",
-                    gen_attr="sw_vs_generalising",
+                    mem_attr=mem_attr,
+                    gen_attr=gen_attr,
                 )
 
-        for col_idx, ylabel in enumerate(ylabels):
+        for col_idx, (ylabel, _, _) in enumerate(shown):
             for row_idx in range(2):
                 _style_ax(axes[row_idx, col_idx], ylabel)
 

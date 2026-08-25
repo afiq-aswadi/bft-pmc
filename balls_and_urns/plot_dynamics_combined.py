@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import tyro
 
-from plotting.paper_style import apply_paper_style
+from plotting.paper_style import apply_paper_style, every_decade_ticks
 
 
 @dataclass
@@ -30,10 +30,12 @@ SERIES_PRIOR = [
 ]
 
 
+
 def style_ax(ax: plt.Axes, ylabel: str | None = None, log_xscale: bool = False) -> None:
     ax.set_yscale("log")
     if log_xscale:
         ax.set_xscale("log")
+        every_decade_ticks(ax.xaxis)
     ax.set_xlabel("Training step")
     if ylabel:
         ax.set_ylabel(ylabel)
@@ -95,7 +97,7 @@ def _plot_dynamics(df: pd.DataFrame, out_path: Path, log_xscale: bool = False) -
             )
 
             row_labels = ["In-distribution", "Out-of-distribution"]
-            ylabels = ["Symmetrized KL", "Energy distance", "Sliced Wasserstein"][
+            ylabels = ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"][
                 :n_cols
             ]
 

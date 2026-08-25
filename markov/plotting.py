@@ -13,7 +13,7 @@ import torch
 from scipy.stats import gaussian_kde
 from scipy.stats import beta as beta_dist
 
-from plotting.paper_style import apply_paper_style
+from plotting.paper_style import apply_paper_style, every_decade_ticks, task_diversity_ticks
 
 
 MEMORISING_COLOR = "tab:green"
@@ -48,8 +48,10 @@ def _style_axis(
     """Apply the shared visual style used by the experiment plots."""
     if log_x_base2:
         ax.set_xscale("log", base=2)
+        task_diversity_ticks(ax.xaxis)
     elif log_x:
         ax.set_xscale("log")
+        every_decade_ticks(ax.xaxis)
 
     if symlog_y:
         ax.set_yscale("symlog", linthresh=linthresh)
@@ -995,6 +997,7 @@ _DISTANCE_DYNAMICS_SERIES = [
 def _style_distance_sweep_axis(ax: plt.Axes, ylabel: str | None = None) -> None:
     """Render the shared Markov distance-sweep layout."""
     ax.set_xscale("log", base=2)
+    task_diversity_ticks(ax.xaxis)
     ax.set_yscale("log")
     ax.set_xlabel(r"$M$")
     if ylabel:
@@ -1145,6 +1148,7 @@ def _style_distance_dynamics_axis(
     ax.set_yscale("log")
     if log_xscale:
         ax.set_xscale("log")
+        every_decade_ticks(ax.xaxis)
     ax.set_xlabel("Training step")
     if ylabel:
         ax.set_ylabel(ylabel)

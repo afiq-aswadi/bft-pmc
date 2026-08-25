@@ -25,7 +25,9 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from plotting.paper_style import apply_paper_style
+from markov.kl_history import load_kl_history
+from markov.run_names import parse_n_chains
+from plotting.paper_style import apply_paper_style, every_decade_ticks
 
 
 SERIES = [
@@ -34,9 +36,11 @@ SERIES = [
 ]
 
 
+
 def _style_ax(ax: plt.Axes, ylabel: str | None = None) -> None:
     ax.set_yscale("log")
     ax.set_xscale("log")
+    every_decade_ticks(ax.xaxis)
     ax.set_xlabel("Training step")
     if ylabel:
         ax.set_ylabel(ylabel)
@@ -92,11 +96,17 @@ def _process_run(
     out_dir: Path,
     *,
     n_chains: int,
+    training_root: Path | None = None,
 ) -> None:
     metrics_path = run_dir / "metrics.csv"
-    wandb_path = run_dir / "wandb_kl_history.csv"
     df = pd.read_csv(metrics_path).sort_values("step")
-    kl_df = pd.read_csv(wandb_path).sort_values("step")
+    kl_df = load_kl_history(run_dir, training_root=training_root)
+    if kl_df is None:
+        raise FileNotFoundError(
+            f"no KL history for {run_dir.name}: expected "
+            f"{run_dir / 'wandb_kl_history.csv'} or a training_log.csv under "
+            "the training root (see markov.kl_history)."
+        )
 
     # Emit both layouts: 2x3 (KL, ED, SW) preserves the historical figure;
     # 2x2 (KL, ED) drops SW for the paper-ready version.
@@ -108,7 +118,7 @@ def _process_run(
         )
 
         row_labels = ["In-distribution", "Out-of-distribution"]
-        ylabels = ["Symmetrized KL", "Energy distance", "Sliced Wasserstein"][:n_cols]
+        ylabels = ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"][:n_cols]
 
         for row_idx, source in enumerate(("in_distribution", "out_of_distribution")):
             sub = _filter_prompt_source(df, source)
@@ -160,21 +170,23 @@ def main() -> None:
         type=Path,
         default=Path("outputs/markov/distribution_dynamics"),
     )
+    parser.add_argument(
+        "--training-root",
+        type=Path,
+        default=None,
+        help="Root holding <run>/training_log.csv; used when a run has no "
+        "wandb_kl_history.csv. Default: outputs/markov/training.",
+    )
     args = parser.parse_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
 
     run_dirs = sorted(path.parent for path in args.runs_dir.glob("*/metrics.csv"))
     assert run_dirs, f"no run metrics found under {args.runs_dir}"
     for run_dir in run_dirs:
-        token = next(
-            (t for t in run_dir.name.split("_") if t.startswith("chains")), None
+        n_chains = parse_n_chains(run_dir.name)
+        _process_run(
+            run_dir, args.out_dir, n_chains=n_chains, training_root=args.training_root
         )
-        if token is None:
-            raise ValueError(
-                f"cannot parse n_chains from run directory {run_dir.name!r}"
-            )
-        n_chains = int(token.removeprefix("chains"))
-        _process_run(run_dir, args.out_dir, n_chains=n_chains)
 
 
 if __name__ == "__main__":
