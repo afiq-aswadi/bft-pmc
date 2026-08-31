@@ -180,6 +180,7 @@ def load_checkpoint(
     checkpoint_path: Path | str,
     device: str = "auto",
     load_optimizer: bool = False,
+    n_ctx_override: int | None = None,
 ) -> tuple[BasePFN, dict | None, CheckpointMetadata]:
     """
     Load checkpoint from disk.
@@ -218,8 +219,57 @@ def load_checkpoint(
     config = ckpt["model_config"]
     device_str = _get_device(device)
     config.device = device_str
+    state_dict = ckpt["model_state_dict"]
+    strict = True
+    dropped_pos_keys: list[str] = []
+    if n_ctx_override is not None and n_ctx_override != config.n_ctx:
+        # Only models trained without positional embeddings define a forward
+        # pass beyond their training context, so refuse anything else.
+        if n_ctx_override < config.n_ctx:
+            raise ValueError(
+                f"n_ctx_override ({n_ctx_override}) must exceed the trained "
+                f"context ({config.n_ctx})."
+            )
+        if getattr(config, "use_pos_emb", True):
+            raise ValueError(
+                "n_ctx_override requires a checkpoint trained with "
+                "use_pos_emb=False."
+            )
+        state_dict = dict(state_dict)
+        # Deterministic context-sized buffers rebuilt at construction; the
+        # positional table must additionally be all zeros to drop safely.
+        context_sized_suffixes = (
+            ".attn.mask",
+            ".attn.masked_bias",
+            ".attn.rotary_sin",
+            ".attn.rotary_cos",
+        )
+        for key in list(state_dict):
+            if key.endswith("pos_embed.W_pos"):
+                if not torch.all(state_dict[key] == 0):
+                    raise ValueError(
+                        f"Expected all-zero positional embeddings, found "
+                        f"nonzero values in {key}."
+                    )
+                del state_dict[key]
+                dropped_pos_keys.append(key)
+            elif key.endswith(context_sized_suffixes):
+                del state_dict[key]
+                dropped_pos_keys.append(key)
+        config.n_ctx = n_ctx_override
+        strict = False
     model = PFNModel(config).to(device_str)
-    model.load_state_dict(ckpt["model_state_dict"])
+    load_result = model.load_state_dict(state_dict, strict=strict)
+    if not strict:
+        unexpected = list(load_result.unexpected_keys)
+        stray_missing = [
+            key for key in load_result.missing_keys if key not in dropped_pos_keys
+        ]
+        if unexpected or stray_missing:
+            raise RuntimeError(
+                f"Checkpoint mismatch beyond positional embeddings: "
+                f"missing={stray_missing}, unexpected={unexpected}"
+            )
     model.eval()
     # attach task distribution if present for downstream use
     if "task_distribution" in ckpt:

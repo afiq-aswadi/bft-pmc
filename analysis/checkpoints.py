@@ -24,9 +24,14 @@ def find_all_checkpoints(run_dir: Path) -> list[Path]:
     return sorted(ckpts, key=get_step)
 
 
-def load_run_info(checkpoint_path: Path, device: str) -> dict:
+def load_run_info(
+    checkpoint_path: Path, device: str, n_ctx_override: int | None = None
+) -> dict:
     model, _, metadata = checkpointing.load_checkpoint(
-        checkpoint_path, device=device, load_optimizer=False
+        checkpoint_path,
+        device=device,
+        load_optimizer=False,
+        n_ctx_override=n_ctx_override,
     )
     assert isinstance(model, BasePFN)
 

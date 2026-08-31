@@ -15,6 +15,10 @@ TARGETS = {
     "markov-threshold": ROOT / "markov" / "task_diversity_threshold.py",
     "path-stability": ROOT / "analysis" / "path_stability.py",
     "compare-pos-encodings": ROOT / "analysis" / "pos_encoding_comparison.py",
+    "bau-rollout-diagnostics": ROOT / "balls_and_urns" / "rollout_diagnostics.py",
+    "markov-rollout-diagnostics": ROOT / "markov" / "rollout_diagnostics.py",
+    "bau-predictive-fidelity": ROOT / "balls_and_urns" / "predictive_fidelity.py",
+    "bau-samples-count-panel": ROOT / "balls_and_urns" / "samples_count_panel.py",
     "plot-lr-sweep": ROOT / "linear_regression" / "plot_sweep_combined.py",
     "plot-lr-dynamics": ROOT / "linear_regression" / "plot_dynamics_combined.py",
     "plot-bau-sweep": ROOT / "balls_and_urns" / "plot_sweep_combined.py",
@@ -35,6 +39,10 @@ Commands:
   markov-threshold  Run the Markov task-diversity threshold experiment.
   path-stability    Scaled-L1 rollout convergence diagnostic (jellyfish plot).
   compare-pos-encodings  Compare the learned/rope/none positional encodings.
+  bau-rollout-diagnostics     Recovery error vs rollout length/count for balls and urns.
+  markov-rollout-diagnostics  Recovery error vs rollout length/count for 1-Markov.
+  bau-predictive-fidelity     Next-token fidelity of BAU checkpoints vs the exact predictive.
+  bau-samples-count-panel     Recovery error vs rollout count from a saved sample bundle.
   plot-lr-sweep     Regenerate the linear-regression sweep figure from metrics.csv.
   plot-lr-dynamics  Regenerate the linear-regression dynamics figure from metrics.csv.
   plot-bau-sweep    Regenerate the balls-and-urns sweep figure from metrics.csv.
@@ -46,6 +54,8 @@ Examples:
   uv run eval.py lr-sweep --checkpoint-root checkpoints/lr/task_diversity
   uv run eval.py markov-sweep --checkpoint-root checkpoints/markov/task_diversity
   uv run eval.py path-stability --inputs rope=outputs/lr/sweep_analysis_rope/sweep_*/samples
+  uv run eval.py bau-rollout-diagnostics --checkpoint-path checkpoints/bau_nope_dim_sweep/vocab12/checkpoint_step_100000.pt --n-ctx-override 1024
+  uv run eval.py markov-rollout-diagnostics --checkpoint-path checkpoints/markov_m32/checkpoint_step_100000.pt
   uv run eval.py plot-lr-sweep --metrics-csv paper_data/lr/sweep/metrics.csv
   uv run eval.py plot-markov-sweep --runs-dir paper_data/markov/sweep/runs --metrics-csv paper_data/markov/sweep/metrics.csv
   uv run eval.py plot-bau-dynamics --metrics-csv paper_data/bau/dynamics/metrics.csv

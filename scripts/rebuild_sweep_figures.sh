@@ -64,7 +64,7 @@ for ENC in learned rope none; do
     run "lr/${ENC} prior panels" python -m linear_regression.plot_sweep_prior \
       --metrics-csv "${LR_SWEEP}metrics.csv" \
       --delta-csv "${LR_SWEEP}prior_delta_mse.csv" \
-      --out-path "${LR_SWEEP}figures_sweep_prior/lr_sweep_prior_delta_ed_sw.pdf"
+      --out-path "${LR_SWEEP}figures_sweep_prior/lr_sweep_prior_delta_ed_sw.png"
   fi
 
   if [[ -n "${BAU_SWEEP}" ]]; then
@@ -77,7 +77,7 @@ for ENC in learned rope none; do
     run "bau/${ENC} prior panels" python -m balls_and_urns.plot_sweep_prior \
       --metrics-csv "${BAU_SWEEP}metrics.csv" \
       --kl-csv "${BAU_SWEEP}prior_predictive_kl.csv" \
-      --out-path "${BAU_SWEEP}figures_sweep/bau_sweep_prior_kl_ed_sw.pdf"
+      --out-path "${BAU_SWEEP}figures_sweep/bau_sweep_prior_kl_ed_sw.png"
   else
     echo "SKIP  bau/${ENC}: no sweep directory found"
   fi
@@ -89,10 +89,10 @@ if [[ -f "${MARKOV}/metrics.csv" ]]; then
   run "markov sweep" python -m markov.plot_sweep_combined \
     --runs-dir "${MARKOV}/runs" \
     --metrics-csv "${MARKOV}/metrics.csv" \
-    --out-path outputs/markov/figures_sweep/markov_sweep_combined.pdf
+    --out-path outputs/markov/figures_sweep/markov_sweep_combined.png
   run "markov sweep prior" python -m markov.plot_sweep_prior \
     --metrics-csv "${MARKOV}/metrics.csv" \
-    --out-path outputs/markov/figures_sweep/markov_sweep_prior_kl_ed_sw.pdf
+    --out-path outputs/markov/figures_sweep/markov_sweep_prior_kl_ed_sw.png
   # KL comes from outputs/markov/training/<run>/training_log.csv, which this
   # sweep did write -- the W&B export the plotters used before does not exist.
   run "markov dynamics" python -m markov.plot_dynamics_combined \
