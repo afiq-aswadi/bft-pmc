@@ -23,10 +23,10 @@ extends the same analysis to 1-Markov exchangeability.
 `M = 32` (right). Green and blue measure agreement with memorising and
 generalising Bayesian references.*
 
-The repository includes the aggregate metrics and evaluation datasets required
-to regenerate the aggregate paper figures produced by
-`scripts/reproduce_paper.sh`, without downloading checkpoints or using a GPU.
-Training and checkpoint-based evaluation code is included for full reruns.
+The repository includes the aggregate metrics and evaluation datasets of the
+original (pre-camera-ready) runs; `scripts/reproduce_paper.sh` regenerates their
+aggregate figures without downloading checkpoints or using a GPU. Training and
+checkpoint-based evaluation code is included for full reruns.
 
 ## Installation
 
@@ -71,10 +71,13 @@ without modifying the script:
 OUTPUT_ROOT=/tmp/bft-pmc-paper-figures bash scripts/reproduce_paper.sh
 ```
 
-For the current manuscript, the script regenerates the aggregate LR,
-balls-and-urns, and Markov task-diversity and training-dynamics panels in
-Figures 4, 8-9, 11-12, and 14-15, including the paper-ready 2-by-2 variants and
-prior-only panels.
+The script regenerates the aggregate LR, balls-and-urns, and Markov
+task-diversity and training-dynamics panels, including the 2-by-2 variants and
+prior-only panels, from the frozen inputs in `paper_data/`. Those inputs predate
+the camera-ready retraining: several camera-ready figures, including main-text
+Figures 4-6, were redrawn from the retrained runs (no positional encoding for LR
+and balls-and-urns; 256-position Markov runs), whose metrics are not yet in
+`paper_data/`. See `paper_data/FIGURE_PROVENANCE.md` for each figure's inputs.
 
 It does not render the schematic, identifiability, or attention-mask figures,
 the Beta-Bernoulli grid, or the sample-based marginal figures. The
@@ -122,7 +125,7 @@ embeddings throughout and has no such flag.
 ### Sequence budgets
 
 All three families hold **256 positions**, so a rollout is 32 prompt
-observations plus 223 generated ones (`N = 255`) in every setting:
+observations plus `N = 223` generated ones (255 in total) in every setting:
 
 | Family | Context | Rollout capacity |
 | --- | --- | --- |
@@ -134,9 +137,9 @@ The evaluation entry points draw 128 prompts with 100 rollouts each for
 posterior mode and 1024 rollouts for prior mode, identically across families.
 
 The continuous-prior Beta-Bernoulli experiment introduced in Figure 1 and
-detailed in Appendix E is available as a separate training-and-PMC entry point.
+detailed in Appendix F is available as a separate training-and-PMC entry point.
 Its defaults match the paper configuration and save the final checkpoint, PMC
-samples, and the Figure 5 grid below `outputs/bau/beta_bernoulli/`:
+samples, and the Figure 20 grid below `outputs/bau/beta_bernoulli/`:
 
 ```bash
 uv run train.py beta-bernoulli
@@ -180,12 +183,25 @@ aggregate figures.
 | `uv run eval.py markov-sweep ...` | Evaluate a Markov checkpoint sweep |
 | `uv run eval.py markov-threshold ...` | Run the Markov task-diversity threshold experiment |
 | `uv run eval.py path-stability ...` | Scaled-L1 rollout convergence diagnostic across families |
+| `uv run eval.py compare-pos-encodings ...` | Compare the learned, rotary, and no-positional-encoding sweeps |
+| `uv run eval.py lr-rollout-diagnostics ...` | Recovery error and drift versus rollout length and count for one LR checkpoint |
+| `uv run eval.py bau-rollout-diagnostics ...` | The same for one balls-and-urns checkpoint |
+| `uv run eval.py markov-rollout-diagnostics ...` | The same for one Markov checkpoint |
+| `uv run eval.py recovery-vs-dimension ...` | Recovery error across latent dimensions or task diversities, read from the per-run diagnostics |
+| `uv run eval.py replot-pmc-diagnostics ...` | Redraw rollout-diagnostics figures from the data their runs saved |
+| `uv run eval.py bau-predictive-fidelity ...` | Next-token fidelity of balls-and-urns checkpoints against the exact predictive |
+| `uv run eval.py bau-samples-count-panel ...` | Rollout-count panel from a saved balls-and-urns sample bundle |
 | `uv run eval.py plot-lr-sweep ...` | Plot the LR task-diversity sweep |
 | `uv run eval.py plot-lr-dynamics ...` | Plot LR training dynamics |
 | `uv run eval.py plot-bau-sweep ...` | Plot the balls-and-urns sweep |
 | `uv run eval.py plot-bau-dynamics ...` | Plot balls-and-urns training dynamics |
 | `uv run eval.py plot-markov-sweep ...` | Plot the Markov task-diversity sweep |
 | `uv run eval.py plot-markov-dynamics ...` | Plot Markov training dynamics |
+
+The rollout diagnostics produce the reliability analyses of Appendix D.
+[`slurm/README.md`](slurm/README.md) (step 5) submits every run, and
+[`slurm/PMC_DIAGNOSTICS.md`](slurm/PMC_DIAGNOSTICS.md) records their settings and
+outputs.
 
 ### Rollout convergence (path stability)
 
@@ -216,10 +232,11 @@ checkpoint or a rollout again:
 | `path_stability.csv` | One row per setup and prefix: `T`, `scaled_l1`, `p`, `prompt_len`, and the bundle's own metadata (step, prompt source, task count) |
 | `path_stability_per_prompt.csv` | The same, resolved per prompt, i.e. per realisation of `z_1:n` |
 | `theta_reference.npz` | `theta(F_n)`, `theta(F_N)`, and the prefix grid per setup |
-| `path_stability.png` / `.pdf` | The figure |
+| `path_stability*.png` / `.pdf` | The figures: all setups, by family, and per positional encoding |
 
-Pass `--stride` to evaluate on a coarser prefix grid, and `--per-prompt-curves`
-to draw one line per prompt rather than one per setup.
+Pass `--stride` to evaluate on a coarser prefix grid, and `--realisations k` to
+draw one line for each of the first `k` prompts rather than their average per
+setup (`--realisations 1` is TabMGP's single-dataset estimand).
 
 The lower-level plotters live with their task family. In particular, each
 family has one canonical aggregate sweep plotter, one dynamics plotter, and one
@@ -265,11 +282,14 @@ balls_and_urns/           balls-and-urns training, evaluation, and figures
 linear_regression/        LR training, evaluation, and figures
 markov/                   Markov training, evaluation, and figures
 models/                   shared model-configuration helpers (positional encodings)
-plotting/                 shared marginal-cell rendering primitives
+plotting/                 shared marginal-cell rendering primitives and paper figure style
 pfn_transformers/         vendored PFN TransformerLens library and its tests
 scripts/                  reproduction and frozen-data preparation utilities
 sweeps/                   YAML sweep launcher and checked-in sweep definitions
+slurm/                    SLURM job scripts for the paper runs and diagnostics (see slurm/README.md)
+tests/                    test suite
 paper_data/               frozen figure inputs and evaluation data
+diagnostics_results/      rebuttal-period diagnostics results (see slurm/PMC_DIAGNOSTICS.md)
 train.py                  unified training dispatcher
 eval.py                   unified evaluation and plotting dispatcher
 metrics.py                shared distribution metrics
