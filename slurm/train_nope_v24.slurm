@@ -6,8 +6,6 @@
 #SBATCH --mem=16G
 #SBATCH --time=12:00:00
 #SBATCH --output=logs/%x-%j.out
-#SBATCH --mail-user=<email>
-#SBATCH --mail-type=BEGIN,END,FAIL
 set -euo pipefail
 cd /projects/qh36/<user>/bft-pmc
 export PYTHONPATH=.:pfn_transformers
