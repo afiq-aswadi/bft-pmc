@@ -23,6 +23,32 @@ class LoadedMarkovArtifacts:
     transition_matrices: torch.Tensor
     stationary_distributions: torch.Tensor
     task_distribution_source: str
+    # The resolved_config.yaml the config was read from; None when it came
+    # from the checkpoint itself.
+    config_path: Path | None = None
+
+    @property
+    def input_files(self) -> tuple[Path, ...]:
+        """Every file the artifacts were read from: checkpoint, config, task distribution."""
+        config = () if self.config_path is None else (self.config_path,)
+        return (
+            self.checkpoint_path,
+            *config,
+            *task_distribution_files(self.task_distribution_source),
+        )
+
+
+def task_distribution_files(source: str) -> tuple[Path, ...]:
+    """The files behind a ``_load_task_distribution`` source tag."""
+    kind, _, run_dir = source.partition(":")
+    if kind == "npy":
+        return (
+            Path(run_dir) / "transition_matrices.npy",
+            Path(run_dir) / "stationary_distributions.npy",
+        )
+    if kind == "pmc_samples":
+        return (Path(run_dir) / "pmc_samples.npz",)
+    return ()
 
 
 def load_markov_state_dict(
@@ -135,11 +161,40 @@ def load_trained_markov_artifacts(
     *,
     device: torch.device | None = None,
     allow_seed_rehydration: bool = False,
+    seq_len_override: int | None = None,
+    rope_scaling: str = "interpolate",
 ) -> LoadedMarkovArtifacts:
-    """Load a trained Markov model plus its dataset/config for downstream analysis."""
+    """Load a trained Markov model plus its dataset/config for downstream analysis.
+
+    ``seq_len_override`` builds the transformer with a longer context, so
+    rollouts can run past the trained one. The weights are used as trained:
+    the rotary tables are non-persistent buffers, absent from the checkpoint
+    and recomputed at construction, so only their length changes.
+
+    ``rope_scaling`` chooses what happens at the positions past the trained
+    context, and the two options trade off against each other:
+
+    - ``"interpolate"`` (default) is linear position interpolation: every
+      position is rescaled by ``config.seq_len / seq_len_override``, so no
+      rotation angle falls outside the trained range. This is the safer
+      extension, but it rescales the trained positions too, so results are
+      *not* comparable with an unextended run and must be regenerated as a set.
+    - ``"extrapolate"`` leaves positions as trained, so the first
+      ``config.seq_len`` positions behave identically and short-rollout results
+      reproduce exactly, while longer ones feed the model rotation angles it
+      never saw.
+
+    The dataset keeps the trained ``seq_len`` either way, so prompt sampling is
+    untouched.
+    """
     checkpoint_path = Path(checkpoint_path)
     if not checkpoint_path.exists():
         raise FileNotFoundError(f"Checkpoint not found at: {checkpoint_path}")
+    if rope_scaling not in {"interpolate", "extrapolate"}:
+        raise ValueError(
+            f"Unknown rope_scaling {rope_scaling!r}; expected 'interpolate' or "
+            "'extrapolate'."
+        )
 
     resolved_device = (
         torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -193,14 +248,27 @@ def load_trained_markov_artifacts(
     dataset.transition_matrices = transition_matrices
     dataset.stationary_distributions = stationary_distributions
 
+    model_seq_len = config.seq_len
+    position_scale = 1.0
+    if seq_len_override is not None and seq_len_override != config.seq_len:
+        if seq_len_override < config.seq_len:
+            raise ValueError(
+                f"seq_len_override ({seq_len_override}) must exceed the trained "
+                f"context ({config.seq_len})."
+            )
+        model_seq_len = seq_len_override
+        if rope_scaling == "interpolate":
+            position_scale = config.seq_len / seq_len_override
+
     model = MarkovTransformer(
         vocab_size=dataset.vocab_size,
         d_model=config.d_model,
-        seq_len=config.seq_len,
+        seq_len=model_seq_len,
         num_layers=config.num_layers,
         num_heads=config.num_heads,
         expansion_factor=config.expansion_factor,
         rope_theta=config.rope_theta,
+        position_scale=position_scale,
     ).to(resolved_device)
     model.load_state_dict(load_markov_state_dict(checkpoint_path, resolved_device))
     model.eval()
@@ -214,4 +282,5 @@ def load_trained_markov_artifacts(
         transition_matrices=transition_matrices,
         stationary_distributions=stationary_distributions,
         task_distribution_source=source,
+        config_path=effective_config_path,
     )

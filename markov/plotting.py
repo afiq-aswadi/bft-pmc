@@ -1099,7 +1099,7 @@ def plot_distribution_distance_sweep(
         for row_index, row_label in enumerate(row_labels):
             axes[row_index, 0].annotate(
                 row_label,
-                xy=(-0.25, 0.5),
+                xy=(-0.33, 0.5),
                 xycoords="axes fraction",
                 ha="center",
                 va="center",
@@ -1243,7 +1243,7 @@ def plot_distribution_distance_dynamics(
         for row_index, row_label in enumerate(row_labels):
             axes[row_index, 0].annotate(
                 row_label,
-                xy=(-0.25, 0.5),
+                xy=(-0.33, 0.5),
                 xycoords="axes fraction",
                 ha="center",
                 va="center",

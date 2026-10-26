@@ -15,6 +15,10 @@ Produces one 2x3 figure per M, matching the LR / BAU layout
 
 KL uses the wellspec (order-1 bigram) baselines: `kl/{id,ood}/wellspec/{memorising,generalising}`.
 Training step axis is always log-scaled because runs span many decades.
+
+Beside each 2x3 figure it writes two paper-ready 2x2 twins:
+`dynamics_M{n}_2x2` (KL, energy distance) and `dynamics_M{n}_2x2_sw` (KL,
+sliced Wasserstein).
 """
 
 from __future__ import annotations
@@ -35,12 +39,22 @@ SERIES = [
     ("Generalizing", "-", "tab:blue"),
 ]
 
+# Figure-name suffix and the metric of each column: the full 2x3 figure, then
+# the two paper-ready 2x2 twins pairing KL with one posterior metric each.
+LAYOUTS: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("", ("kl", "ed", "sw")),
+    ("_2x2", ("kl", "ed")),
+    ("_2x2_sw", ("kl", "sw")),
+)
+YLABELS = {"kl": "Symmetrised KL", "ed": "Energy distance", "sw": "Sliced Wasserstein"}
 
 
 def _style_ax(ax: plt.Axes, ylabel: str | None = None) -> None:
     ax.set_yscale("log")
     ax.set_xscale("log")
-    every_decade_ticks(ax.xaxis)
+    # These runs log from step 1, so the axis spans six decades in a
+    # half-width panel; every decade would run the labels together.
+    every_decade_ticks(ax.xaxis, max_ticks=4)
     ax.set_xlabel("Training step")
     if ylabel:
         ax.set_ylabel(ylabel)
@@ -108,33 +122,31 @@ def _process_run(
             "the training root (see markov.kl_history)."
         )
 
-    # Emit both layouts: 2x3 (KL, ED, SW) preserves the historical figure;
-    # 2x2 (KL, ED) drops SW for the paper-ready version.
-    for layout, suffix in [("2x3", ""), ("2x2", "_2x2")]:
-        n_cols = 3 if layout == "2x3" else 2
+    for suffix, columns in LAYOUTS:
+        n_cols = len(columns)
         apply_paper_style(4.2 * n_cols, 0.49 if n_cols == 2 else 0.95)
         fig, axes = plt.subplots(
             2, n_cols, figsize=(4.2 * n_cols, 6.2), constrained_layout=True, sharey="col"
         )
 
         row_labels = ["In-distribution", "Out-of-distribution"]
-        ylabels = ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"][:n_cols]
 
         for row_idx, source in enumerate(("in_distribution", "out_of_distribution")):
             sub = _filter_prompt_source(df, source)
-            _plot_kl(axes[row_idx, 0], kl_df, source)
-            _plot_metric(axes[row_idx, 1], sub, metric="ed")
-            if n_cols == 3:
-                _plot_metric(axes[row_idx, 2], sub, metric="sw")
+            for col_idx, metric in enumerate(columns):
+                if metric == "kl":
+                    _plot_kl(axes[row_idx, col_idx], kl_df, source)
+                else:
+                    _plot_metric(axes[row_idx, col_idx], sub, metric=metric)
 
-        for col_idx, ylabel in enumerate(ylabels):
+        for col_idx, metric in enumerate(columns):
             for row_idx in range(2):
-                _style_ax(axes[row_idx, col_idx], ylabel)
+                _style_ax(axes[row_idx, col_idx], YLABELS[metric])
 
         for row_idx, row_label in enumerate(row_labels):
             axes[row_idx, 0].annotate(
                 row_label,
-                xy=(-0.55, 0.5),
+                xy=(-0.72, 0.5),
                 xycoords="axes fraction",
                 ha="center",
                 va="center",

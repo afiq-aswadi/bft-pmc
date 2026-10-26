@@ -30,7 +30,8 @@ variants. Prefer it to reconstructing the calls by hand.
 
 | Figures (count) | Generator | Inputs | Input location |
 | --- | --- | --- | --- |
-| `lr_sweep_combined_2x2`, `bau_sweep_posterior{,_2x2}`, `bau_sweep_prior_kl_ed_sw`, `markov_sweep_combined{,_2x2}`, `markov_sweep_prior_kl_ed_sw`, `lr_sweep_prior_delta_ed_sw` (8) | `linear_regression/plot_sweep_combined.py`, `balls_and_urns/plot_sweep_combined.py`, `markov/plot_sweep_combined.py`, `{linear_regression,balls_and_urns,markov}/plot_sweep_prior.py` | `paper_data/{lr,bau,markov}/sweep/` | repo |
+| `lr_sweep_combined_2x2`, `lr_sweep_prior_delta_ed_sw`, `bau_sweep_posterior{,_2x2}`, `bau_sweep_prior_kl_ed_sw` (5) | `linear_regression/plot_sweep_combined.py`, `balls_and_urns/plot_sweep_combined.py`, `{linear_regression,balls_and_urns}/plot_sweep_prior.py` | `outputs/lr/sweep_analysis_none/sweep_20260821_221637/metrics.csv`, `outputs/bau/sweep_analysis_none/20260819_194316/metrics.csv` | repo (pulled from M3) |
+| `markov_sweep_combined{,_2x2}`, `markov_sweep_prior_kl_ed_sw` (3) | `markov/plot_sweep_combined.py`, `markov/plot_sweep_prior.py` | `paper_data/markov/sweep/` (unverified, see note below) | repo |
 | `lr_dynamics_combined_logx_2x2`, `bau_dynamics_combined_logx{,_2x2}`, `markov_dynamics_M8{,_2x2}` (5) | `linear_regression/plot_dynamics_combined.py`, `balls_and_urns/plot_dynamics_combined.py`, `markov/plot_dynamics_combined.py` | `paper_data/{lr,bau}/dynamics/`, `paper_data/markov/dynamics_m8/` | repo |
 | `lr_grid_marginal_4dim_T8_*` (3), `lr_stitched_*` (6), `lr_1x1_M8_dim0.pdf` (1) | `python -m linear_regression.plot_marginals --num-dims 4`, `.plot_stitched_marginals`, `.plot_single_marginal` | LR sweep `samples/*.npz` | M3: `outputs/lr/sweep_analysis_{learned,rope,none}/sweep_*/` |
 | `bau_grid_marginal_4dim_*` (3), `stitched_bau_*` (6) | `python -m balls_and_urns.plot_marginals --num-dims 4`, `.plot_stitched_marginals` | BAU `samples/*.npz` | M3: `outputs/bau/sweep_analysis_{learned,rope,none}/*/` |
@@ -101,3 +102,5 @@ BAU is unaffected (identical seed 42 across all three).
 3. `paper_data/markov/dynamics_m8/` duplicates the M=8 `wandb_kl_history.csv`
    from `paper_data/markov/sweep/runs/` (same run, same file): the sweep uses
    its last row, the dynamics plot uses the full trajectory. Deliberate.
+
+> **Correction, 2026-09-20.** The sweep row previously recorded `paper_data/{lr,bau,markov}/sweep/` as the input for all eight figures. That is wrong for linear regression and balls-and-urns: those figures were swapped to the no-positional-encoding runs, and `paper_data/{lr,bau}/sweep/metrics.csv` is superseded. The two disagree materially — the stale BAU file puts the posterior switch at $M=2^8$–$2^9$ and shows no prediction-space switch at all, whereas the NoPE run gives $2^7$–$2^8$ and $2^9$–$2^{10}$, which is what the paper states and what was verified against these CSVs. The Markov sweep row and the dynamics row below carry the same risk and have **not** been re-checked.

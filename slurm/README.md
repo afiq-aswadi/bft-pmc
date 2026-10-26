@@ -91,6 +91,32 @@ sbatch --dependency=afterok:<LR_EVAL>:<BAU_EVAL>:<MK_EVAL> slurm/path_stability.
 Writes `outputs/path_stability/`: `path_stability.csv`,
 `path_stability_per_prompt.csv`, `theta_reference.npz`, and the figure.
 
+## 5. Rollout diagnostics
+
+Recovery error vs rollout length and count, drift vs length and the jellyfish plot for
+linear regression, balls and urns and Markov, plus latent-dimension sweeps for balls and urns
+and Markov, all with 1024 rollouts and every model in the configuration of step 2. Linear
+regression and balls and urns also roll out past their training context, to N=500. Independent
+of steps 3–4; needs the M=32 checkpoints from step 2:
+
+```bash
+bash slurm/submit_pmc_diagnostics.sh --dry-run
+bash slurm/submit_pmc_diagnostics.sh
+```
+
+The same diagnostics at task diversities either side of each family's threshold need other
+checkpoints from step 2. When those sit in scratch space, point `CHECKPOINT_SOURCE` at the
+scratch directory laid out like the repository root; the final checkpoints are copied into the
+repository before anything is submitted:
+
+```bash
+CHECKPOINT_SOURCE=/path/to/scratch/bft-pmc \
+  bash slurm/submit_pmc_diagnostics.sh --only lr-taskdiv,bau-taskdiv,markov-taskdiv
+```
+
+[`PMC_DIAGNOSTICS.md`](PMC_DIAGNOSTICS.md) records every run's settings, what it and each
+submission save, and how to reproduce the runs or redraw their figures.
+
 ## Disk
 
 **Checkpoints dominate.** LR and BAU save one checkpoint per 500 steps

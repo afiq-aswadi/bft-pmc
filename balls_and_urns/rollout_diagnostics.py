@@ -9,14 +9,23 @@ For one checkpoint, generates rollout trajectories once, then reads off:
      subsampling the rollout set, alongside a Monte Carlo floor from fresh
      baseline draws of the same size.
 
-Everything is saved under --output-dir: trajectories and per-path drift as
-.npz, curves as .csv, figures as .png/.pdf.
+Everything is saved under --output-dir, per prompt source, so every figure
+can be redrawn (analysis/replot_pmc_diagnostics.py) or every curve recomputed
+without the model:
+  - {source}_trajectories.npz: the rollout tokens, prompt and urn index;
+  - {source}_baselines.npz: the baseline sample sets, task pool and alpha;
+  - {source}_recovery_vs_length.csv, {source}_drift_vs_length.csv and
+    {source}_recovery_vs_count.csv: the plotted curves;
+  - {source}_drift_paths.npz: per-path drift, running estimates and anchor;
+  - {source}_recovery_vs_count_resamples.csv: every draw behind the count panel;
+  - run_record.json and figures.json: settings, provenance and figure index;
+  - <run>_rollouts.npz: the posterior rollouts, for the jellyfish plot.
 """
 
 from __future__ import annotations
 
 import sys
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
 import numpy as np
@@ -27,18 +36,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from analysis.checkpoints import load_run_info
 from analysis.pmc_diagnostics import (
-    count_curves,
+    check_rollouts_fit_context,
+    count_curves_with_resamples,
+    on_isolated_torch_stream,
     drift_curves,
     plot_counts,
     plot_drift,
     plot_recovery,
+    record_figure,
     recovery_curves,
+    save_path_stability_bundle,
+    write_run_record,
 )
 from balls_and_urns.analysis import precompute_baseline_samples
 from balls_and_urns.baselines import (
     sample_generalising_posterior,
     sample_memorising_posterior,
 )
+from models.pos_encoding import positional_encoding_of
 from pfn_transformerlens.model.PFN import UnsupervisedPFN
 
 
@@ -66,6 +81,17 @@ class DiagnosticsConfig:
         default_factory=lambda: [16, 32, 64, 128, 256, 512, 1024]
     )
     n_resamples: int = 50
+    # Rollout-count panel: draw an independent pool of rollouts per repeat
+    # rather than resampling one saved pool. The repeats then share no
+    # rollouts, so the spread is Monte Carlo error rather than subset-selection
+    # noise, at roughly n_resamples times the rollout cost. Off by default:
+    # only the figures that report that spread need it.
+    independent_count_pools: bool = False
+
+    # jellyfish bundle: one curve per realisation of the observed data, as in
+    # TabMGP Figure 8, each realisation its own prompt and rollouts.
+    jellyfish_prompts: int = 20
+    jellyfish_rollouts: int = 128
 
     n_projections: int = 100
     chunk_size: int = 256
@@ -76,6 +102,10 @@ class DiagnosticsConfig:
     def validate(self) -> None:
         if self.steps < 1 or self.num_rollouts < 1:
             raise ValueError("steps and num_rollouts must be positive.")
+        if self.jellyfish_prompts < 1 or self.jellyfish_rollouts < 1:
+            raise ValueError(
+                "jellyfish_prompts and jellyfish_rollouts must be positive."
+            )
         if max(self.length_grid) > self.steps:
             raise ValueError("length_grid entries cannot exceed steps.")
         if max(self.count_grid) > self.num_rollouts:
@@ -85,6 +115,43 @@ class DiagnosticsConfig:
         unknown = set(self.prompt_sources) - {"prior", "posterior"}
         if unknown:
             raise ValueError(f"Unknown prompt sources: {sorted(unknown)}")
+
+
+def jellyfish_rollouts(
+    model: UnsupervisedPFN,
+    *,
+    theta_pool: torch.Tensor,
+    bos_token: int,
+    config: DiagnosticsConfig,
+    rng: np.random.Generator,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Rollouts from several prompt realisations, for the jellyfish plot.
+
+    TabMGP draws the path-stability curve once per realisation of the observed
+    data (their Figure 8), so each realisation here is a fresh prompt from a
+    fresh urn. Returns trajectories of shape (realisations, rollouts,
+    prompt_length + steps) and the urn behind each.
+    """
+    realisations: list[np.ndarray] = []
+    urns: list[int] = []
+    for _ in range(config.jellyfish_prompts):
+        urn_index = int(rng.integers(theta_pool.shape[0]))
+        prompt = torch.multinomial(
+            theta_pool[urn_index], config.prompt_length, replacement=True
+        ).to(torch.float32)
+        realisations.append(
+            rollout_trajectories(
+                model,
+                steps=config.steps,
+                num_rollouts=config.jellyfish_rollouts,
+                bos_token=bos_token,
+                prompt=prompt,
+                temperature=config.temperature,
+                chunk_size=min(config.chunk_size, config.jellyfish_rollouts),
+            )
+        )
+        urns.append(urn_index)
+    return np.stack(realisations), np.asarray(urns, dtype=np.int32)
 
 
 def rollout_trajectories(
@@ -159,6 +226,7 @@ def analyze_source(
     config: DiagnosticsConfig,
     output_dir: Path,
     rng: np.random.Generator,
+    fresh_model_sampler=None,
 ) -> None:
     vocab_size = int(alpha.shape[0])
     prompt_length = int(prompt_tokens.shape[0])
@@ -188,14 +256,32 @@ def analyze_source(
         baselines = _posterior_samples(config.num_rollouts)
         fresh_baseline_sampler = _posterior_samples
 
+    np.savez_compressed(
+        output_dir / f"{source}_baselines.npz",
+        **{name: np.asarray(samples) for name, samples in baselines.items()},
+        task_pool=theta_pool.numpy(),
+        alpha=alpha.numpy(),
+        prompt_tokens=prompt_tokens,
+    )
+
     thetas = running_theta(trajectories, vocab_size, prompt_length, grid)
 
     recovery = recovery_curves(thetas, baselines, grid, config.n_projections)
     recovery.to_csv(output_dir / f"{source}_recovery_vs_length.csv", index=False)
+    recovery_title = (
+        f"{source}: recovery error vs rollout length (R={config.num_rollouts})"
+    )
     plot_recovery(
         recovery,
         output_dir / f"{source}_recovery_vs_length",
-        f"{source}: recovery error vs rollout length (R={config.num_rollouts})",
+        recovery_title,
+    )
+    record_figure(
+        output_dir,
+        f"{source}_recovery_vs_length",
+        kind="recovery",
+        title=recovery_title,
+        csv=f"{source}_recovery_vs_length.csv",
     )
 
     if source == "prior":
@@ -215,15 +301,24 @@ def analyze_source(
         thetas_at_grid=thetas,
         anchor_theta=anchor_theta,
     )
+    drift_title = f"{source}: drift from {anchor_label}"
     plot_drift(
         drift,
         per_path,
         grid,
         output_dir / f"{source}_drift_vs_length",
-        f"{source}: drift from {anchor_label}",
+        drift_title,
+    )
+    record_figure(
+        output_dir,
+        f"{source}_drift_vs_length",
+        kind="drift",
+        title=drift_title,
+        csv=f"{source}_drift_vs_length.csv",
+        paths=f"{source}_drift_paths.npz",
     )
 
-    counts_frame = count_curves(
+    counts_frame, resamples = count_curves_with_resamples(
         thetas[:, -1, :],
         baselines,
         fresh_baseline_sampler,
@@ -231,12 +326,25 @@ def analyze_source(
         config.n_resamples,
         config.n_projections,
         rng,
+        fresh_model_sampler=fresh_model_sampler,
     )
     counts_frame.to_csv(output_dir / f"{source}_recovery_vs_count.csv", index=False)
+    resamples.to_csv(
+        output_dir / f"{source}_recovery_vs_count_resamples.csv", index=False
+    )
+    counts_title = f"{source}: recovery error vs rollout count (N={grid[-1]})"
     plot_counts(
         counts_frame,
         output_dir / f"{source}_recovery_vs_count",
-        f"{source}: recovery error vs rollout count (N={grid[-1]})",
+        counts_title,
+    )
+    record_figure(
+        output_dir,
+        f"{source}_recovery_vs_count",
+        kind="counts",
+        title=counts_title,
+        csv=f"{source}_recovery_vs_count.csv",
+        resamples=f"{source}_recovery_vs_count_resamples.csv",
     )
 
 
@@ -255,13 +363,36 @@ def main(config: DiagnosticsConfig) -> None:
     )
     model = run_info["model"]
     assert isinstance(model, UnsupervisedPFN)
+    context_length = int(model.transformer.cfg.n_ctx)
+    check_rollouts_fit_context(
+        steps=config.steps,
+        prompt_length=config.prompt_length,
+        prompt_sources=config.prompt_sources,
+        context_length=context_length,
+    )
     theta_pool = torch.as_tensor(run_info["tasks"], dtype=torch.float32)
     vocab_size = int(theta_pool.shape[1])
     bos_token = vocab_size
     alpha = torch.ones(vocab_size) * config.alpha_value
+    write_run_record(
+        output_dir,
+        asdict(config),
+        inputs=[config.checkpoint_path],
+        family="bau",
+        device=str(next(model.parameters()).device),
+        vocab_size=vocab_size,
+        latent_dimension=vocab_size - 1,
+        drift_scale=vocab_size - 1,
+        num_tasks=int(theta_pool.shape[0]),
+        bos_token=bos_token,
+        model_context=context_length,
+        pos_encoding=positional_encoding_of(model.config),
+        checkpoint_metadata=asdict(run_info["metadata"]),
+    )
 
     for source in config.prompt_sources:
         if source == "prior":
+            urn_index = -1
             prompt_tensor = None
             prompt_tokens = np.empty((0,), dtype=np.int16)
         else:
@@ -285,10 +416,29 @@ def main(config: DiagnosticsConfig) -> None:
             output_dir / f"{source}_trajectories.npz",
             trajectories=trajectories,
             prompt_tokens=prompt_tokens,
+            urn_index=np.asarray(urn_index),
             vocab_size=np.asarray(vocab_size),
             steps=np.asarray(config.steps),
             checkpoint_path=np.asarray(str(config.checkpoint_path)),
         )
+        def fresh_model_sampler(r: int, _prompt=prompt_tensor) -> np.ndarray:
+            # An independent pool of r rollouts, not a subset of the saved one.
+            fresh = rollout_trajectories(
+                model,
+                steps=config.steps,
+                num_rollouts=r,
+                bos_token=bos_token,
+                prompt=_prompt,
+                temperature=config.temperature,
+                chunk_size=config.chunk_size,
+            )
+            return running_theta(
+                fresh,
+                int(alpha.shape[0]),
+                int(prompt_tokens.shape[0]),
+                sorted(config.length_grid),
+            )[:, -1, :]
+
         analyze_source(
             source=source,
             trajectories=trajectories,
@@ -298,8 +448,35 @@ def main(config: DiagnosticsConfig) -> None:
             config=config,
             output_dir=output_dir,
             rng=rng,
+            fresh_model_sampler=(
+                on_isolated_torch_stream(
+                    fresh_model_sampler, config.seed + 10_000
+                )
+                if config.independent_count_pools
+                else None
+            ),
         )
         print(f"[{source}] diagnostics written to {output_dir}")
+
+    # After every diagnostic, so the rollouts above keep their random stream:
+    # the jellyfish bundle, one prompt realisation per curve.
+    if "posterior" in config.prompt_sources:
+        realisations, urn_indices = jellyfish_rollouts(
+            model,
+            theta_pool=theta_pool,
+            bos_token=bos_token,
+            config=config,
+            rng=rng,
+        )
+        save_path_stability_bundle(
+            output_dir,
+            prompt_length=config.prompt_length,
+            checkpoint_path=config.checkpoint_path,
+            arrays={"rollout_tokens": realisations},
+            prompt_source="in_distribution",
+            num_tasks=int(theta_pool.shape[0]),
+            urn_index=urn_indices,
+        )
 
 
 if __name__ == "__main__":

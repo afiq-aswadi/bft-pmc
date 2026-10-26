@@ -8,6 +8,22 @@ import numpy as np
 
 from pfn_transformerlens.model.PFN import BasePFN, PFNModel
 from pfn_transformerlens.model.configs.base import BasePFNConfig
+from pfn_transformerlens.model.configs.unsupervised import UnsupervisedPFNConfig
+
+
+def extend_positional_table(
+    table: torch.Tensor, n_ctx: int, period: int
+) -> torch.Tensor:
+    """Grow a learned positional table to ``n_ctx`` rows.
+
+    Every trained row is kept. Each position past the trained context reuses
+    the last trained position with the same index modulo ``period``, so with
+    ``period=2`` an x token still gets an x-slot embedding and a y token a
+    y-slot one.
+    """
+    trained = table.shape[0]
+    offsets = torch.arange(n_ctx - trained, device=table.device) % period
+    return torch.cat([table, table[trained - period + offsets]], dim=0)
 
 
 @dataclass
@@ -223,36 +239,32 @@ def load_checkpoint(
     strict = True
     dropped_pos_keys: list[str] = []
     if n_ctx_override is not None and n_ctx_override != config.n_ctx:
-        # Only models trained without positional embeddings define a forward
-        # pass beyond their training context, so refuse anything else.
+        # Run past the training context, so rollouts can exceed it. Masks and
+        # rotary tables are deterministic in n_ctx and rebuilt at construction.
+        # A model without positional embeddings reads no position, so its
+        # forward pass on the first n_ctx positions is unchanged. A learned
+        # positional table has no rows past the trained context: it is grown by
+        # repeating the last trained position of each token slot (one slot for
+        # a plain sequence, two for interleaved x/y tokens), which keeps every
+        # trained row and the x/y alternation.
         if n_ctx_override < config.n_ctx:
             raise ValueError(
                 f"n_ctx_override ({n_ctx_override}) must exceed the trained "
                 f"context ({config.n_ctx})."
             )
-        if getattr(config, "use_pos_emb", True):
-            raise ValueError(
-                "n_ctx_override requires a checkpoint trained with "
-                "use_pos_emb=False."
-            )
         state_dict = dict(state_dict)
-        # Deterministic context-sized buffers rebuilt at construction; the
-        # positional table must additionally be all zeros to drop safely.
         context_sized_suffixes = (
             ".attn.mask",
             ".attn.masked_bias",
             ".attn.rotary_sin",
             ".attn.rotary_cos",
         )
+        period = 1 if isinstance(config, UnsupervisedPFNConfig) else 2
         for key in list(state_dict):
             if key.endswith("pos_embed.W_pos"):
-                if not torch.all(state_dict[key] == 0):
-                    raise ValueError(
-                        f"Expected all-zero positional embeddings, found "
-                        f"nonzero values in {key}."
-                    )
-                del state_dict[key]
-                dropped_pos_keys.append(key)
+                state_dict[key] = extend_positional_table(
+                    state_dict[key], n_ctx_override, period
+                )
             elif key.endswith(context_sized_suffixes):
                 del state_dict[key]
                 dropped_pos_keys.append(key)

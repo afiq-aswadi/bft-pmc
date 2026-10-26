@@ -221,7 +221,7 @@ def main() -> None:
     for row, row_label in enumerate(row_labels):
         axes[row, 0].annotate(
             row_label,
-            xy=(-0.32, 0.5),
+            xy=(-0.42, 0.5),
             xycoords="axes fraction",
             ha="center",
             va="center",

@@ -101,12 +101,48 @@ def task_diversity_ticks(axis: object, max_ticks: int = 6) -> None:
     axis.set_major_locator(OddPowerOfTwoLocator(max_ticks))
 
 
-def every_decade_ticks(axis: object) -> None:
+class DecadeLocator(Locator):
+    """Powers of ten, thinned to a budget over the visible range.
+
+    ``every_decade_ticks`` pins every decade, which is right for an axis
+    spanning three of them but collides once a half-width panel has to show
+    six: the 10^0..10^5 training-step axes run their labels together. Thinning
+    against the *visible* decade range keeps a three-decade axis labelled at
+    every decade while a six-decade one steps to every second.
+    """
+
+    def __init__(self, max_ticks: int = 4) -> None:
+        self.max_ticks = max_ticks
+
+    def __call__(self) -> list[float]:
+        return self.tick_values(*self.axis.get_view_interval())
+
+    def tick_values(self, vmin: float, vmax: float) -> list[float]:
+        if vmin <= 0 or vmax <= 0 or not math.isfinite(vmin) or not math.isfinite(vmax):
+            return []
+        low, high = sorted((vmin, vmax))
+        powers = list(
+            range(math.floor(math.log10(low)), math.ceil(math.log10(high)) + 1)
+        )
+        stride = 1
+        while len(powers[::stride]) > self.max_ticks:
+            stride += 1
+        return [float(10**power) for power in powers[::stride]]
+
+
+def every_decade_ticks(axis: object, max_ticks: int | None = None) -> None:
     """Label every power of ten on a log axis.
 
     Matplotlib thins log ticks as soon as labels would collide, and the paper
     font scaling is large enough relative to the panels that it drops every
     second decade (10^1, 10^3, 10^5 instead of 10^0..10^5). Pinning the locator
     keeps the axis matching the published figures at any font size.
+
+    Pass ``max_ticks`` to cap the label count instead: an axis within the
+    budget still gets every decade, and only a wider one steps. Use it where
+    the range is wide enough that every decade would collide.
     """
-    axis.set_major_locator(LogLocator(base=10.0, numticks=99))
+    if max_ticks is None:
+        axis.set_major_locator(LogLocator(base=10.0, numticks=99))
+        return
+    axis.set_major_locator(DecadeLocator(max_ticks))

@@ -39,6 +39,7 @@ import pandas as pd
 import tyro
 
 from analysis.rollouts import load_rollout_bundle
+from analysis.pmc_diagnostics import write_run_record
 from plotting.paper_style import apply_paper_style
 
 
@@ -614,6 +615,21 @@ def main(config: PathStabilityConfig) -> None:
     aggregate, per_prompt = curves_to_frames(curves)
     aggregate.to_csv(output_dir / "path_stability.csv", index=False)
     per_prompt.to_csv(output_dir / "path_stability_per_prompt.csv", index=False)
+
+    # Provenance for the figures: every bundle behind them, with its checksum,
+    # alongside the code, packages and machine that drew them.
+    write_run_record(
+        output_dir,
+        asdict(config),
+        inputs=[
+            str(bundle)
+            for entry in config.inputs
+            for bundle in discover_bundles(parse_input(entry)[1])
+        ],
+        family="jellyfish",
+        setups=[curve.setup for curve in curves],
+        realisations=config.realisations,
+    )
 
     references: dict[str, np.ndarray] = {}
     for curve in curves:

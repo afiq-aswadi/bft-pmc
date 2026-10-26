@@ -158,7 +158,7 @@ def _plot_dynamics(df: pd.DataFrame, out_path: Path, log_xscale: bool = False) -
             for row_idx, row_label in enumerate(row_labels):
                 axes[row_idx, 0].annotate(
                     row_label,
-                    xy=(-0.55, 0.5),
+                    xy=(-0.72, 0.5),
                     xycoords="axes fraction",
                     ha="center",
                     va="center",

@@ -314,7 +314,80 @@ def test_markov_aggregate_figure_entry_points(
         ],
     )
     markov_prior.main()
-    assert len(saved_figures) == 8
+    # Sweep and each dynamics run: the full figure plus the KL/ED and KL/SW twins.
+    assert [path.name for path in saved_figures] == [
+        "markov_sweep.png",
+        "markov_sweep_2x2.png",
+        "markov_sweep_2x2_sw.png",
+        "dynamics_M32.png",
+        "dynamics_M32_2x2.png",
+        "dynamics_M32_2x2_sw.png",
+        "dynamics_M8.png",
+        "dynamics_M8_2x2.png",
+        "dynamics_M8_2x2_sw.png",
+        "markov_prior.png",
+        "markov_prior.png",
+    ]
+
+
+def test_markov_paper_twins_pair_kl_with_one_posterior_metric(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    saved_figures: list[Path],
+) -> None:
+    """Each saved figure's columns, read off the y-labels drawn for it."""
+
+    def columns_per_figure(module, run) -> list[list[str]]:
+        labels: list[str] = []
+        monkeypatch.setattr(
+            module, "_style_ax", lambda ax, ylabel=None: labels.append(ylabel)
+        )
+        run()
+        # Every column is styled once per row, and there are two rows.
+        per_figure, start = [], 0
+        for n_cols in (3, 2, 2):
+            per_figure.append(labels[start : start + 2 * n_cols : 2])
+            start += 2 * n_cols
+        assert start == len(labels)
+        return per_figure
+
+    expected = [
+        ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"],
+        ["Symmetrised KL", "Energy distance"],
+        ["Symmetrised KL", "Sliced Wasserstein"],
+    ]
+    sweep_root = PAPER_DATA / "markov/sweep"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_sweep_combined.py",
+            "--runs-dir",
+            str(sweep_root / "runs"),
+            "--metrics-csv",
+            str(sweep_root / "metrics.csv"),
+            "--out-path",
+            str(tmp_path / "markov_sweep.png"),
+        ],
+    )
+    assert columns_per_figure(markov_sweep, markov_sweep.main) == expected
+
+    run_dir = next((PAPER_DATA / "markov/dynamics_m8/runs").iterdir())
+    assert (
+        columns_per_figure(
+            markov_dynamics,
+            lambda: markov_dynamics._process_run(run_dir, tmp_path, n_chains=8),
+        )
+        == expected
+    )
+    assert [path.name for path in saved_figures] == [
+        "markov_sweep.png",
+        "markov_sweep_2x2.png",
+        "markov_sweep_2x2_sw.png",
+        "dynamics_M8.png",
+        "dynamics_M8_2x2.png",
+        "dynamics_M8_2x2_sw.png",
+    ]
 
 
 def test_markov_aggregate_plot_edge_paths(
@@ -438,8 +511,8 @@ def test_markov_aggregate_plot_edge_paths(
         }
     ).to_csv(run_dir / "wandb_kl_history.csv", index=False)
     markov_dynamics._process_run(run_dir, tmp_path, n_chains=2)
-    # two dynamics grids here, plus the one KL-less sweep figure drawn above
-    assert len(saved_figures) == 3
+    # three dynamics grids here, plus the one KL-less sweep figure drawn above
+    assert len(saved_figures) == 4
 
     monkeypatch.setattr(
         sys,

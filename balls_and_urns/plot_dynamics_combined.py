@@ -35,7 +35,9 @@ def style_ax(ax: plt.Axes, ylabel: str | None = None, log_xscale: bool = False) 
     ax.set_yscale("log")
     if log_xscale:
         ax.set_xscale("log")
-        every_decade_ticks(ax.xaxis)
+        # These runs log from step 1, so the axis spans six decades in a
+        # half-width panel; every decade would run the labels together.
+        every_decade_ticks(ax.xaxis, max_ticks=4)
     ax.set_xlabel("Training step")
     if ylabel:
         ax.set_ylabel(ylabel)
@@ -45,7 +47,7 @@ def style_ax(ax: plt.Axes, ylabel: str | None = None, log_xscale: bool = False) 
     ax.grid(True, alpha=0.3, linestyle="--")
 
 
-def _add_shared_legend(fig: plt.Figure, ax: plt.Axes, anchor_y: float = 1.06) -> None:
+def _add_shared_legend(fig: plt.Figure, ax: plt.Axes, anchor_y: float = 1.12) -> None:
     handles, labels = ax.get_legend_handles_labels()
     if handles:
         fig.legend(
@@ -168,7 +170,7 @@ def _plot_dynamics(df: pd.DataFrame, out_path: Path, log_xscale: bool = False) -
             for row_idx, row_label in enumerate(row_labels):
                 axes[row_idx, 0].annotate(
                     row_label,
-                    xy=(-0.55, 0.5),
+                    xy=(-0.72, 0.5),
                     xycoords="axes fraction",
                     ha="center",
                     va="center",

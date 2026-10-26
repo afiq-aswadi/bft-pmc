@@ -42,8 +42,13 @@ def find_latest_checkpoint(run_dir: Path) -> Path | None:
 def load_run_info(
     checkpoint_path: Path,
     device: torch.device | str | None = None,
+    n_ctx_override: int | None = None,
 ) -> RunInfo:
-    """Load checkpoint and extract run info."""
+    """Load checkpoint and extract run info.
+
+    ``n_ctx_override`` builds the model with a longer token context, so
+    rollouts can run past the trained one; see ``checkpointing.load_checkpoint``.
+    """
     resolved_device = (
         torch.device("cuda" if torch.cuda.is_available() else "cpu")
         if device is None
@@ -53,6 +58,7 @@ def load_run_info(
         checkpoint_path,
         device=str(resolved_device),
         load_optimizer=False,
+        n_ctx_override=n_ctx_override,
     )
     assert isinstance(model, SupervisedPFN)
 

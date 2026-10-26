@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -345,6 +346,19 @@ def test_main_writes_every_reproduction_artifact(tmp_path: Path) -> None:
     assert (out_dir / "path_stability_per_prompt.csv").is_file()
     assert (out_dir / "path_stability.png").is_file()
     assert (out_dir / "config.json").is_file()
+
+    # The run record names every bundle the curves came from, with its checksum.
+    record = json.loads((out_dir / "run_record.json").read_text())
+    assert record["context"]["family"] == "jellyfish"
+    assert sorted(record["inputs"]) == sorted(
+        str(samples / name)
+        for name in (
+            "T4_memorising_L2_rollouts.npz",
+            "run__source_data_memorising_rollouts.npz",
+        )
+    )
+    assert all(len(digest) == 64 for digest in record["inputs"].values())
+    assert sorted(record["context"]["setups"]) == sorted(aggregate["setup"].unique())
     with np.load(out_dir / "theta_reference.npz") as references:
         assert "rope/T4_memorising_L2::theta_n" in references.files
         assert "rope/T4_memorising_L2::grid" in references.files

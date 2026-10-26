@@ -9,15 +9,25 @@ def precompute_rotary_frequencies(
     head_dim: int,
     max_seq_len: int,
     theta: float,
+    position_scale: float = 1.0,
 ) -> tuple[torch.Tensor, torch.Tensor]:
-    """Precompute rotary embedding frequencies up to the max sequence length."""
+    """Precompute rotary embedding frequencies up to the max sequence length.
+
+    ``position_scale`` below 1 applies linear position interpolation (Chen et
+    al., 2023): position p is rotated as though it sat at ``p * position_scale``.
+    A table longer than the trained context then still only uses angles from
+    inside it, at the cost of changing the angle at every position, the trained
+    ones included.
+    """
     if head_dim % 2 != 0:
         raise ValueError("Rotary embeddings require an even head dimension.")
+    if position_scale <= 0:
+        raise ValueError("position_scale must be positive.")
 
     inverse_frequency = 1.0 / (
         theta ** (torch.arange(0, head_dim, 2, dtype=torch.float32) / head_dim)
     )
-    positions = torch.arange(max_seq_len, dtype=torch.float32)
+    positions = torch.arange(max_seq_len, dtype=torch.float32) * position_scale
     frequencies = torch.outer(positions, inverse_frequency)
     frequencies = torch.cat((frequencies, frequencies), dim=-1)
     return frequencies.cos(), frequencies.sin()
@@ -65,6 +75,7 @@ class CausalSelfAttention(nn.Module):
         num_heads: int,
         max_seq_len: int,
         theta: float,
+        position_scale: float = 1.0,
     ) -> None:
         super().__init__()
         if d_model % num_heads != 0:
@@ -83,6 +94,7 @@ class CausalSelfAttention(nn.Module):
             head_dim=self.head_dim,
             max_seq_len=max_seq_len,
             theta=theta,
+            position_scale=position_scale,
         )
         self.register_buffer("freqs_cos", freqs_cos, persistent=False)
         self.register_buffer("freqs_sin", freqs_sin, persistent=False)
@@ -132,6 +144,7 @@ class DecoderBlock(nn.Module):
         expansion_factor: int,
         max_seq_len: int,
         theta: float,
+        position_scale: float = 1.0,
     ) -> None:
         super().__init__()
         self.attention = CausalSelfAttention(
@@ -139,6 +152,7 @@ class DecoderBlock(nn.Module):
             num_heads=num_heads,
             max_seq_len=max_seq_len,
             theta=theta,
+            position_scale=position_scale,
         )
         self.norm1 = nn.LayerNorm(d_model)
         self.norm2 = nn.LayerNorm(d_model)
@@ -166,10 +180,12 @@ class MarkovTransformer(nn.Module):
         num_heads: int,
         expansion_factor: int,
         rope_theta: float,
+        position_scale: float = 1.0,
     ) -> None:
         super().__init__()
         self.embedding = nn.Embedding(vocab_size, d_model)
         self._max_seq_len = seq_len
+        self._position_scale = position_scale
         self.layers = nn.ModuleList(
             [
                 DecoderBlock(
@@ -178,6 +194,7 @@ class MarkovTransformer(nn.Module):
                     expansion_factor=expansion_factor,
                     max_seq_len=seq_len,
                     theta=rope_theta,
+                    position_scale=position_scale,
                 )
                 for _ in range(num_layers)
             ]
@@ -188,6 +205,11 @@ class MarkovTransformer(nn.Module):
     def max_seq_len(self) -> int:
         """Maximum input length supported by the transformer."""
         return self._max_seq_len
+
+    @property
+    def position_scale(self) -> float:
+        """Rotary position-interpolation factor; 1.0 leaves positions as trained."""
+        return self._position_scale
 
     def forward(self, tokens: torch.Tensor) -> torch.Tensor:
         x = self.embedding(tokens)

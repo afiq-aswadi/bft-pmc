@@ -14,6 +14,7 @@ from markov.analysis_common import (
     _load_task_distribution,
     load_markov_state_dict,
     load_trained_markov_artifacts,
+    task_distribution_files,
 )
 from markov.baselines import (
     bi_inf_posterior_alpha,
@@ -473,6 +474,13 @@ def test_markov_artifact_loading_sources_and_full_loader(tmp_path: Path) -> None
     assert artifacts.task_distribution_source.startswith("npy:")
     assert not artifacts.model.training
     assert torch.equal(artifacts.transition_matrices, dataset.transition_matrices)
+    run_dir = checkpoint_path.parent
+    assert artifacts.input_files == (
+        checkpoint_path,
+        run_dir / "resolved_config.yaml",
+        run_dir / "transition_matrices.npy",
+        run_dir / "stationary_distributions.npy",
+    )
 
     npy_source = _load_task_distribution(
         [checkpoint_path.parent], config, device, False
@@ -487,6 +495,7 @@ def test_markov_artifact_loading_sources_and_full_loader(tmp_path: Path) -> None
     )
     pmc_source = _load_task_distribution([pmc_dir], config, device, False)
     assert pmc_source[2].startswith("pmc_samples:")
+    assert task_distribution_files(pmc_source[2]) == (pmc_dir / "pmc_samples.npz",)
 
     empty_dir = tmp_path / "empty"
     empty_dir.mkdir()
@@ -495,6 +504,7 @@ def test_markov_artifact_loading_sources_and_full_loader(tmp_path: Path) -> None
         _load_task_distribution([empty_dir], config, device, False)
     rehydrated = _load_task_distribution([empty_dir], config, device, True)
     assert rehydrated[2] == "seed_rehydration"
+    assert task_distribution_files(rehydrated[2]) == ()
 
 
 def test_markov_artifact_loading_config_fallbacks_and_errors(tmp_path: Path) -> None:
@@ -521,6 +531,12 @@ def test_markov_artifact_loading_config_fallbacks_and_errors(tmp_path: Path) -> 
         None, payload_path, device=torch.device("cpu")
     )
     assert artifacts.config == config
+    assert artifacts.config_path is None
+    assert artifacts.input_files == (
+        payload_path,
+        tmp_path / "transition_matrices.npy",
+        tmp_path / "stationary_distributions.npy",
+    )
 
     missing_checkpoint = tmp_path / "missing.pt"
     with pytest.raises(FileNotFoundError, match="Checkpoint not found"):

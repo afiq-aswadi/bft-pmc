@@ -11,7 +11,10 @@ ED and SW are read from the top-level
 KL uses the last-step wellspec values from each run's
 `runs/<run>/wandb_kl_history.csv` (`kl/{id,ood}/wellspec/{memorising,generalising}`).
 
-Layout matches the linear-regression and balls-and-urns sweep figures.
+Layout matches the linear-regression and balls-and-urns sweep figures. With all
+three metrics present, two paper-ready 2x2 twins are written beside the full
+figure: `<stem>_2x2` (KL, energy distance) and `<stem>_2x2_sw` (KL, sliced
+Wasserstein).
 """
 
 from __future__ import annotations
@@ -201,21 +204,23 @@ def main() -> None:
             file=sys.stderr,
         )
 
-    # Emit the full figure and, when there is a column to spare, the narrower
-    # paper-ready twin that drops the last metric.
+    # Emit the full figure and, when all three metrics are present, the two
+    # narrower paper-ready twins: KL with energy distance, and KL with sliced
+    # Wasserstein.
     args.out_path.parent.mkdir(parents=True, exist_ok=True)
-    layouts = [(len(panels), "")]
-    if len(panels) > 2:
-        layouts.append((len(panels) - 1, "_2x2"))
+    layouts = [(panels, "")]
+    if len(panels) == len(ALL_PANELS):
+        kl_panel, ed_panel, sw_panel = panels
+        layouts += [([kl_panel, ed_panel], "_2x2"), ([kl_panel, sw_panel], "_2x2_sw")]
 
-    for n_cols, suffix in layouts:
+    for shown, suffix in layouts:
+        n_cols = len(shown)
         apply_paper_style(4.2 * n_cols, 0.49 if n_cols == 2 else 0.95)
         fig, axes = plt.subplots(
             2, n_cols, figsize=(4.2 * n_cols, 6.2), constrained_layout=True, sharey="col"
         )
 
         row_labels = ["In-distribution", "Out-of-distribution"]
-        shown = panels[:n_cols]
 
         for row_idx, source in enumerate(("in_distribution", "out_of_distribution")):
             rows = rows_by_source[source]
@@ -234,7 +239,7 @@ def main() -> None:
         for row_idx, row_label in enumerate(row_labels):
             axes[row_idx, 0].annotate(
                 row_label,
-                xy=(-0.55, 0.5),
+                xy=(-0.72, 0.5),
                 xycoords="axes fraction",
                 ha="center",
                 va="center",
