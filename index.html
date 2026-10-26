@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Predictive Monte Carlo — what a Bayes-filtered transformer believes</title>
+<meta name="description" content="Explore predictive Monte Carlo estimates of implicit task priors and posteriors in Bayes-filtered transformers, alongside memorizing and generalizing references.">
+<link rel="stylesheet" href="vendor/katex/katex.min.css?v=260143a6">
+<link rel="stylesheet" href="assets/styles.css?v=7e5146c1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%23111110'/%3E%3Cpath d='M6 24V8h5a4 4 0 010 8H9v8zM9 13.2h2a1.2 1.2 0 000-2.4H9zM17 24V8h3.1l2.9 6.6L25.9 8H29v16h-3v-9.4l-2.1 4.8h-1.8L20 14.6V24z' fill='%23fff'/%3E%3C/svg%3E">
+</head>
+<body>
+
+<header class="head">
+  <div class="wrap head-in">
+    <a class="mark" href="#top">Predictive Monte Carlo</a>
+    <nav>
+      <a href="#explore">Explore</a>
+      <a href="#sweep">Sweep</a>
+      <a href="#figures">Figures</a>
+      <a href="#about">About</a>
+    </nav>
+    <div class="util">
+      <a href="https://github.com/afiq-aswadi/bft-pmc" rel="noopener">Code</a>
+      <a href="https://openreview.net/forum?id=qZ5gMk6Gpd">Paper</a>
+      <a href="https://github.com/afiq-aswadi/bft-pmc/blob/main/icl2_supplementary.pdf">Supplement</a>
+    </div>
+  </div>
+</header>
+
+<main id="top">
+
+  <!-- ===================================================== hero ========= -->
+  <section class="hero">
+    <div class="wrap hero-grid">
+      <div>
+        <p class="eyebrow">Interactive supplementary material · NeurIPS 2026</p>
+        <h1>What does a Bayes-filtered transformer believe?</h1>
+        <p class="lead">
+          A Bayes-filtered transformer is trained to predict observations generated from a
+          latent task <span data-tex="\theta"></span>. In the idealized limit, its predictions reproduce the Bayesian
+          posterior predictive distribution. What prior and posterior does a trained model
+          approximate in practice?
+        </p>
+        <p class="lead">Predictive Monte Carlo (PMC) addresses this question by generating
+          sequences from the model and estimating the latent task <span data-tex="\theta"></span> from each completed
+          sequence. Explore the resulting distributions for linear regression,
+          balls-and-urns, and Markov chains, and compare them with the memorizing and
+          generalizing references studied in the paper.</p>
+        <div class="hero-actions">
+          <a class="btn" href="#explore">Explore the distributions</a>
+          <a class="btn ghost" href="#about">How PMC works</a>
+        </div>
+        <p class="note">Interactive plots use precomputed samples. Changing the controls
+          updates their visualization in your browser.</p>
+      </div>
+
+      <div class="teaser">
+        <div class="teaser-head">
+          <p class="eyebrow">One coefficient, three values of <span data-tex="M"></span></p>
+          <p class="eyebrow" id="teaser-coord">Linear regression</p>
+        </div>
+
+        <p class="keys">
+          <span class="key"><i style="background:#c8901a"></i>PMC estimate</span>
+          <span class="key"><i style="background:#2f9e41"></i>Memorizing reference</span>
+          <span class="key"><i style="background:#1f77b4"></i>Generalizing reference</span>
+        </p>
+
+        <div class="teaser-cells" id="teaser-cells">
+          <div class="teaser-cell"><canvas></canvas><div class="teaser-cap"><span>M = 32</span><span>—</span></div></div>
+          <div class="teaser-cell"><canvas></canvas><div class="teaser-cap"><span>M = 128</span><span>—</span></div></div>
+          <div class="teaser-cell"><canvas></canvas><div class="teaser-cap"><span>M = 256</span><span>—</span></div></div>
+        </div>
+
+        <p class="teaser-note">
+          Each panel shows the recovered marginal distribution of <span data-tex="w_1"></span>
+          for a transformer trained on <span data-tex="M"></span> latent tasks. The references
+          describe Bayesian inference under the finite training-task prior or the population prior.
+        </p>
+        <p class="teaser-note">Each example conditions on its own in-distribution prompt.
+          These panels illustrate individual recovered marginals. The task-diversity sweeps
+          below compare results across evaluation prompts.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ================================================== explorer ======== -->
+  <section class="section" id="explore" style="padding-top:44px">
+    <div class="wrap section-head">
+      <p class="eyebrow">01 — Explorer</p>
+      <h2>Explore the recovered task distribution</h2>
+      <p>
+        Select a task family, task diversity <span data-tex="M"></span>, and conditioning setting to compare PMC estimates
+        with the two reference distributions. Prior estimates use no observed prompt. Posterior
+        estimates condition on one in-distribution prompt <span data-tex="c"></span> of length <span data-tex="\ell=32"></span>.
+      </p>
+      <p>Select a coordinate to inspect its marginal density and cumulative distribution
+        function (CDF). Adjust the rollout length <span data-tex="N"></span> to examine how the estimate changes as
+        more observations are generated.</p>
+    </div>
+
+    <div class="wrap explorer">
+      <form class="rail dark" id="rail" onsubmit="return false">
+        <div class="rail-grid">
+          <div class="ctl">
+            <span class="ctl-label">Task family</span>
+            <div class="seg-v" id="c-family" role="group" aria-label="Task family"></div>
+          </div>
+
+          <div class="ctl">
+            <span class="ctl-label">Task diversity <span data-tex="M"></span></span>
+            <div class="seg" id="c-m" role="group" aria-label="Task diversity"></div>
+          </div>
+
+          <div class="ctl">
+            <span class="ctl-label">Conditioning</span>
+            <div class="seg-v" id="c-cond" role="group" aria-label="Conditioning"></div>
+          </div>
+
+          <div class="ctl">
+            <label class="ctl-label" for="c-len">
+              <span>Rollout length <span data-tex="N"></span></span>
+              <span class="ctl-value" id="c-len-val">500</span>
+            </label>
+            <div class="rollout">
+              <button class="play" id="c-play" aria-pressed="false"
+                      aria-label="Animate rollout length">▶</button>
+              <input class="slider" type="range" id="c-len" min="0" max="8" step="1" value="8">
+            </div>
+            <p class="note">Generated observations after the prompt. Press play to step
+              through the recorded lengths.</p>
+            <p class="note" id="context-note"></p>
+          </div>
+
+          <div class="ctl">
+            <span class="ctl-label">Curves</span>
+            <div class="series-list" id="c-layers" role="group" aria-label="Curves">
+              <button type="button" data-layer="pmc" aria-pressed="true">
+                <i style="background:#c8901a"></i>PMC estimate</button>
+              <button type="button" data-layer="mem" aria-pressed="true">
+                <i style="background:#2f9e41"></i><span id="mem-label"></span></button>
+              <button type="button" data-layer="gen" aria-pressed="true">
+                <i style="background:#1f77b4"></i><span id="gen-label"></span></button>
+            </div>
+            <p class="key-static">
+              <i class="dotted" style="border-top-color:#1f77b4"></i>
+              Analytic generalizing reference
+            </p>
+          </div>
+        </div>
+      </form>
+
+      <div class="stage">
+        <div class="plot-card">
+          <div class="plot-head">
+            <span class="plot-title" id="focus-title">—</span>
+            <span class="plot-sub" id="focus-sub"></span>
+          </div>
+          <canvas id="focus-canvas" role="img"
+                  aria-label="Density and CDF for the selected coordinate"></canvas>
+        </div>
+
+        <div class="stats">
+          <div class="stat-figs" id="stat-rows"></div>
+          <p class="stat-note" id="stat-note"></p>
+        </div>
+
+        <div class="multiples">
+          <div class="multiples-head">
+            <p class="eyebrow" id="multiples-label">Latent-task coordinates</p>
+            <p class="eyebrow hint">Click a panel to focus it</p>
+          </div>
+          <div class="cells" id="cells"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== sweep ======== -->
+  <section class="section" id="sweep">
+    <div class="wrap section-head">
+      <p class="eyebrow">02 — Sweep</p>
+      <h2>How agreement with the references changes</h2>
+      <p>
+        Compare distances to the memorizing and generalizing references as task diversity <span data-tex="M"></span>
+        or training step varies. Within each metric, a smaller distance indicates closer
+        agreement with that reference. A crossover identifies a change in the closer
+        reference under the selected metric and evaluation setting.
+      </p>
+      <p>The explorer includes selected values of <span data-tex="M"></span>. The sweep covers the available
+        powers of two for each family. Markers identify values available in the explorer.
+        Hover over a curve to inspect its value.</p>
+    </div>
+
+    <div class="wrap sweep">
+      <form id="sweep-rail" onsubmit="return false">
+        <div class="ctl">
+          <span class="ctl-label">Task family</span>
+          <div class="seg-v" id="s-family" role="group" aria-label="Comparison task family"></div>
+        </div>
+        <div class="ctl">
+          <span class="ctl-label">Measurement</span>
+          <div class="seg-v" id="s-kind" role="group" aria-label="Measurement">
+            <button type="button" data-kind="sweep" aria-pressed="true">Task diversity <span data-tex="M"></span></button>
+            <button type="button" data-kind="dynamics" aria-pressed="false">Training dynamics</button>
+            <button type="button" data-kind="prior" aria-pressed="false">Prior predictive comparison</button>
+          </div>
+        </div>
+        <div class="ctl" id="s-metric-wrap">
+          <span class="ctl-label">Distance metric</span>
+          <div class="seg-v" id="s-metric" role="group" aria-label="Distance metric"></div>
+        </div>
+        <div class="ctl" id="s-cond-wrap">
+          <span class="ctl-label">Conditioning</span>
+          <div class="seg-v" id="s-cond" role="group" aria-label="Conditioning"></div>
+        </div>
+        <div class="ctl">
+          <span class="ctl-label">Series</span>
+          <div class="series-list" id="s-series"></div>
+        </div>
+        <div class="ctl">
+          <span class="ctl-label">Y axis</span>
+          <div class="seg-v" id="s-scale" role="group" aria-label="Y scale">
+            <button type="button" data-scale="log" aria-pressed="true">Log</button>
+            <button type="button" data-scale="linear" aria-pressed="false">Linear</button>
+          </div>
+        </div>
+      </form>
+
+      <div>
+        <div class="plot-head" style="border:0;padding:0 0 10px">
+          <span class="plot-title" id="sweep-title">—</span>
+          <span class="plot-sub" id="sweep-sub"></span>
+        </div>
+        <div class="canvas-card">
+          <canvas id="sweep-canvas" role="img" aria-label="Metric curves"></canvas>
+          <div class="readout" id="sweep-readout"></div>
+        </div>
+        <div class="arch-fig" id="sweep-paper-figure" hidden></div>
+        <p class="note" id="sweep-note"></p>
+      </div>
+    </div>
+  </section>
+
+  <!-- =================================================== figures ======== -->
+  <section class="section" id="figures">
+    <div class="wrap section-head">
+      <p class="eyebrow">03 — Figure archive</p>
+      <h2>Marginal distributions across task diversities</h2>
+      <p>
+        Browse marginal densities and CDFs across the available task diversities <span data-tex="M"></span> and prompt
+        sources. These figures complement the selected configurations in the interactive explorer.
+      </p>
+      <p>Linear-regression and balls-and-urns grids show densities above CDFs. Markov-chain
+        figures show densities and CDFs as separate matrices of transition-probability
+        marginals for <span data-tex="Q_{a,b}"></span>. Select a figure to enlarge it.</p>
+    </div>
+
+    <div class="wrap">
+      <div class="arch-controls">
+        <div class="bar-group">
+          <span class="bar-label">Task</span>
+          <div class="arch-seg" id="a-family" role="group" aria-label="Archive task family"></div>
+        </div>
+        <div class="bar-group">
+          <span class="bar-label">Conditioning</span>
+          <div class="arch-seg" id="a-source" role="group" aria-label="Archive conditioning"></div>
+        </div>
+        <div class="bar-group">
+          <span class="bar-label"><label for="a-m">Task diversity <span data-tex="M"></span></label></span>
+          <input class="slider wide" type="range" id="a-m" min="0" max="12" step="1" value="6">
+          <span class="val dark" id="a-m-val">M = 64</span>
+        </div>
+      </div>
+
+      <div class="arch-fig" id="a-figure"></div>
+
+      <div class="arch-extra">
+        <div class="arch-controls" style="margin-top:34px">
+          <div class="bar-group">
+            <span class="bar-label">Related figure</span>
+            <div class="arch-seg" id="a-extra" role="group" aria-label="Related figure"></div>
+          </div>
+        </div>
+        <div class="arch-fig" id="a-extra-figure"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================================================== about ======== -->
+  <section class="section" id="about">
+    <div class="wrap section-head">
+      <p class="eyebrow">04 — About</p>
+      <h2>How to interpret the distributions</h2>
+    </div>
+
+    <div class="wrap">
+      <div class="defs">
+        <div class="def" style="--c:var(--pmc)">
+          <h4>PMC</h4>
+          <p class="def-sub">PMC estimate</p>
+          <p>PMC generates multiple continuations from the same prompt <span data-tex="c"></span> and estimates the latent
+            task <span data-tex="\theta"></span> from each completed sequence. The distribution of these estimates approximates
+            the model’s implicit prior when the prompt is empty, or its implicit posterior when
+            observations are supplied.</p>
+        </div>
+        <div class="def" style="--c:var(--mem)">
+          <h4><span data-tex="\Pi_M"></span></h4>
+          <p class="def-sub">Memorizing reference</p>
+          <p>The memorizing reference uses the empirical prior over the <span data-tex="M"></span>
+            training tasks. Before observing a prompt <span data-tex="c"></span>, those tasks have equal probability.
+            After conditioning, their probabilities are updated using the prompt likelihood.
+            The posterior remains supported on the training tasks and may favor one or several.</p>
+        </div>
+        <div class="def" style="--c:var(--gen)">
+          <h4><span data-tex="\Pi_\infty"></span></h4>
+          <p class="def-sub">Generalizing reference</p>
+          <p>The generalizing reference uses the population prior from which the training tasks
+            were sampled: Gaussian over regression coefficients <span data-tex="w"></span>, Dirichlet over urn proportions <span data-tex="p"></span>,
+            and independently Dirichlet over each row of a Markov transition matrix <span data-tex="Q"></span>. Individual
+            probability coordinates in the categorical families have Beta marginals.</p>
+        </div>
+      </div>
+
+      <div class="read-grid">
+        <section>
+          <h3>Reading a panel</h3>
+          <p>Density plots show where samples concentrate. CDFs show how probability accumulates.
+            The memorizing reference is discrete, so its exact CDF is a weighted step function.
+            It need not consist of a single jump.</p>
+          <p>The explorer represents both references with finite samples. Histogram widths and
+            smoothing affect density peaks. Interpret a narrow peak through its probability
+            mass rather than its height alone. Tall reference bars may be clipped.</p>
+          <p>Coordinate ranges can differ between panels. Read the axis labels when comparing
+            locations or spreads. The dotted blue curve is the analytic generalizing marginal.</p>
+        </section>
+        <section>
+          <h3>Rollout length <span data-tex="N"></span></h3>
+          <p>Increasing rollout length <span data-tex="N"></span> changes the finite-sequence estimate of the latent task <span data-tex="\theta"></span>.
+            It can reduce some estimation effects, but does not guarantee monotonically improving
+            accuracy or agreement with either reference. Short rollouts should not generally
+            be interpreted as prior samples.</p>
+          <p>For linear regression, <span data-tex="N"></span> counts covariate–response pairs. For balls-and-urns and Markov
+            chains, it counts observations, excluding the beginning-of-sequence token. The explorer
+            includes rollouts beyond the training context. Linear regression and balls-and-urns
+            use no positional encoding. The extended Markov runs use rescaled rotary positions.</p>
+        </section>
+        <section>
+          <h3>Data and reproducibility</h3>
+          <p>The explorer displays 512 samples per distribution from saved diagnostic runs.
+            Each posterior configuration uses one in-distribution prompt <span data-tex="c"></span> of length <span data-tex="\ell=32"></span>. The paper’s posterior
+            sweeps instead average distances over multiple evaluation prompts.</p>
+          <p>The <a href="https://openreview.net/forum?id=qZ5gMk6Gpd">paper</a> and
+            <a href="https://github.com/afiq-aswadi/bft-pmc/blob/main/icl2_supplementary.pdf">supplementary material</a> describe
+            the experimental settings, reference distributions, and reliability analyses.
+            <a href="https://github.com/afiq-aswadi/bft-pmc">Code and data provenance</a>
+            are available in the project repository.</p>
+        </section>
+      </div>
+      <div class="reading-notes">
+        <p>In prior views, the references are <span data-tex="\Pi_M"></span> and
+          <span data-tex="\Pi_\infty"></span>. In posterior views, they are
+          <span data-tex="\Pi^{\mathrm{mem}}(\cdot\mid c)"></span> and
+          <span data-tex="\Pi^{\mathrm{gen}}(\cdot\mid c)"></span>, conditioned on the observed prompt <span data-tex="c"></span>.</p>
+        <p>Interpreting PMC estimates as implicit priors and posteriors relies on conditions
+          discussed in the paper that are not established for the trained models. Stable
+          estimates alone do not establish accurate recovery. Disagreement with a reference
+          can reflect model–reference mismatch, finite-rollout estimation effects, and sampling variability.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot-in">
+    <span>Supplementary material · <em>What does a Bayes-filtered transformer believe?
+      A predictive Monte Carlo approach</em></span>
+    <span>Aswadi, Ma &amp; Wei · NeurIPS 2026 · <a href="https://openreview.net/forum?id=qZ5gMk6Gpd">Paper</a>
+      · <a href="https://github.com/afiq-aswadi/bft-pmc/blob/main/icl2_supplementary.pdf">Supplementary material</a></span>
+  </div>
+</footer>
+
+<div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="Enlarged figure">
+  <button class="close" id="lightbox-close" aria-label="Close">×</button>
+  <img id="lightbox-img" alt="">
+  <p class="cap" id="lightbox-cap"></p>
+</div>
+
+<script src="vendor/katex/katex.min.js?v=a43bf9e2"></script>
+<script src="data/pmc_index.js?v=311753d1"></script>
+<script src="data/figures.js?v=400f1240"></script>
+<script src="data/series.js?v=360d1a7a"></script>
+<script src="assets/plot.js?v=5373ba97"></script>
+<script src="assets/app.js?v=1931d638"></script>
+</body>
+</html>
