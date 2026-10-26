@@ -1,9 +1,11 @@
 #!/bin/bash
 # Redraw every paper figure the committed data supports, with no checkpoints, GPU
-# or network access: the Beta-Bernoulli figures (Figure 1), the identifiability
-# example (Figure 2), and the aggregate task-diversity, prior and training-dynamics
-# figures of all three families from paper_data/ (the original runs; see
-# paper_data/README.md for how they differ from the camera-ready ones).
+# or network access:
+#   - the Beta-Bernoulli figures (Figure 1) and the identifiability example (Figure 2);
+#   - from paper_data/camera_ready/: the camera-ready LR and balls-and-urns sweep
+#     figures and all 41 reliability figures of Appendix D and the supplement;
+#   - from paper_data/{lr,bau,markov}/: the aggregate task-diversity, prior and
+#     training-dynamics figures of the original runs (see paper_data/README.md).
 #
 #   bash scripts/reproduce_paper.sh                          # -> outputs/paper_reproduction/
 #   OUTPUT_ROOT=/tmp/figures bash scripts/reproduce_paper.sh
@@ -27,6 +29,23 @@ uv run train.py beta-bernoulli \
 
 uv run eval.py plot-identifiability \
     --out-path "${OUTPUT_ROOT}/misc/intro_identifiability_spike_slab.png"
+
+# ---- Camera-ready figures, from the retrained runs ---------------------------
+
+uv run eval.py plot-lr-sweep \
+    --metrics-csv paper_data/camera_ready/lr/sweep/metrics.csv \
+    --prompt-length 32 \
+    --output-dir "${OUTPUT_ROOT}/camera_ready/lr/sweep"
+
+uv run eval.py plot-bau-sweep \
+    --metrics-csv paper_data/camera_ready/bau/sweep/metrics.csv \
+    --output-dir "${OUTPUT_ROOT}/camera_ready/bau/sweep"
+
+uv run eval.py plot-reliability \
+    --diagnostics-root paper_data/camera_ready/pmc_diagnostics \
+    --paper-dir "${OUTPUT_ROOT}/camera_ready/reliability"
+
+# ---- Original-run figures ----------------------------------------------------
 
 uv run eval.py plot-lr-sweep \
     --metrics-csv paper_data/lr/sweep/metrics.csv \

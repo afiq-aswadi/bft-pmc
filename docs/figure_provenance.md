@@ -18,13 +18,14 @@ store holds the pre-retraining runs).
 | --- | --- | --- | --- |
 | `beta_bernoulli_main_figure`, `grid_beta_bernoulli` (2) | `train.py beta-bernoulli --replot-from paper_data/beta_bernoulli/pmc_samples.npz` (writes `beta_bernoulli_pmc_grid` and `beta_bernoulli_main_figure`; the latter is grid panel `--main-figure-index` on its own axes) | the 100k-step run's PMC samples and model | repo: `paper_data/beta_bernoulli/` |
 | `intro_identifiability_spike_slab` (1) | `eval.py plot-identifiability` | analytic, no data | — |
-| `lr_sweep_combined_2x2`, `lr_sweep_prior_delta_ed_sw`, `bau_sweep_posterior{,_2x2}`, `bau_sweep_prior_kl_ed_sw` (5) | `eval.py plot-lr-sweep --prompt-length 32`, `plot-lr-prior`, `plot-bau-sweep`, `plot-bau-prior` | `lr/sweep_analysis_none/sweep_20260821_221637/metrics.csv`, `bau/sweep_analysis_none/20260819_194316/metrics.csv`, plus their prior sidecar CSVs | outputs |
+| `lr_sweep_combined_2x2`, `bau_sweep_posterior{,_2x2}` (3) | `eval.py plot-lr-sweep --prompt-length 32`, `plot-bau-sweep` | the no-positional-encoding sweeps' `metrics.csv` (`outputs/lr/sweep_analysis_none/sweep_20260821_221637/`, `outputs/bau/sweep_analysis_none/20260819_194316/`) | repo: `paper_data/camera_ready/{lr,bau}/sweep/` |
+| `lr_sweep_prior_delta_ed_sw`, `bau_sweep_prior_kl_ed_sw` (2) | `eval.py plot-lr-prior`, `plot-bau-prior` | the same `metrics.csv`, plus the prior sidecar CSVs (`prior_delta_mse.csv`, `prior_predictive_kl.csv`) of those sweeps | sidecars: cluster |
 | `markov_sweep_combined{,_2x2}`, `markov_sweep_prior_kl_ed_sw` (3) | `eval.py plot-markov-sweep`, `plot-markov-prior` | `paper_data/markov/sweep/` (unverified; see the correction below) | repo |
 | `lr_dynamics_combined_logx_2x2`, `bau_dynamics_combined_logx{,_2x2}`, `markov_dynamics_M8{,_2x2}` (5) | `eval.py plot-lr-dynamics`, `plot-bau-dynamics`, `plot-markov-dynamics` | `paper_data/{lr,bau}/dynamics/`, `paper_data/markov/dynamics_m8/` (unverified; see below) | repo |
 | `lr_grid_marginal_4dim_T8_*` (3), `lr_stitched_*` (6), `lr_1x1_M8_dim0.pdf` (1) | `eval.py plot-lr-marginals --num-dims 4`, `plot-lr-stitched-marginals`, `plot-lr-single-marginal` | LR sweep `samples/*.npz` | cluster: `outputs/lr/sweep_analysis_{learned,rope,none}/sweep_*/` |
 | `bau_grid_marginal_4dim_*` (3), `stitched_bau_*` (6) | `eval.py plot-bau-marginals --num-dims 4`, `plot-bau-stitched-marginals` | balls-and-urns sweep `samples/*.npz` | cluster: `outputs/bau/sweep_analysis_{learned,rope,none}/*/` |
 | `markov_K4_M4_*` (3), `markov_full_M*` (60) | `eval.py plot-markov-marginals --prompt-length 32` (K4: `--max-classes 4 --n-chains 4 --print-frac 0.45`) | Markov `samples/M{n}_{prior,in_distribution_L32,out_of_distribution_L32}.npz` | cluster: `outputs/markov/sweep_analysis/samples/` |
-| `reliability_*` (41: Appendix D and the supplement) | `eval.py plot-reliability --paper-dir ../icl2latex` | the per-run CSVs and run records of `outputs/pmc_diagnostics/`; the written `reliability_figure_manifest.json` records every input's SHA-256 and every plotted value | outputs |
+| `reliability_*` (41: Appendix D and the supplement) | `eval.py plot-reliability --diagnostics-root paper_data/camera_ready/pmc_diagnostics --paper-dir ../icl2latex` | the per-run CSVs and run records of 37 diagnostics runs; the written `reliability_figure_manifest.json` records every input's SHA-256 and every plotted value | repo: `paper_data/camera_ready/pmc_diagnostics/` (copied from `outputs/pmc_diagnostics/`) |
 | `ar-pfn-mask.pgf` (1) | **unknown**: no generator in this repository | none (schematic) | — |
 
 `scripts/rebuild_marginals.sh` regenerates every marginal grid, with the right
@@ -53,6 +54,17 @@ shadow the top-level `plotting/` package, disappeared when the code moved into
 the single `bft_pmc` package. Run everything through `eval.py` and `train.py`.)
 
 ## History
+
+### Frozen camera-ready inputs, 2026-10-26
+
+The inputs of the reliability figures and of the camera-ready sweep figures
+were copied into `paper_data/camera_ready/`, and the figures redrawn from them
+were checked against the paper: all 41 reliability figures render
+pixel-identical, and the three sweep figures are pixel-identical given the
+plotter layout they were drawn with (see that directory's README). The
+`reliability_figure_manifest.json` in the paper repository predates the
+2026-10-22 rerun of Appendix D.3: for `reliability_{length,count}_{prior,posterior}`
+it still records the runs without `_pools`, which those figures no longer use.
 
 ### Correction, 2026-09-20
 

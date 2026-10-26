@@ -10,7 +10,9 @@ redraws them under `outputs/paper_reproduction/`.
 steps, balls-and-urns with a 16-token prompt, Markov with a 1024-state context.
 Several camera-ready figures were redrawn from the retrained runs instead (no
 positional encoding for LR and balls-and-urns, 256 positions everywhere, a
-32-observation prompt), whose inputs live in the untracked `outputs/` tree.
+32-observation prompt). Their inputs are frozen separately in
+[`camera_ready/`](camera_ready/README.md): the LR and balls-and-urns sweep
+metrics and every input of the 41 reliability figures.
 [`docs/figure_provenance.md`](../docs/figure_provenance.md) says which input
 each paper figure uses. Each snapshot keeps the `config.json` it was produced
 with, written by the code of that time, so some keys (the Laplace options of
@@ -33,6 +35,7 @@ paper_data/
     dynamics_m32/          M=32 aggregate and per-prompt metrics and KL history
     dynamics_m8/           M=8 aggregate and per-prompt metrics and KL history
   beta_bernoulli/          the 100k-step Beta-Bernoulli model, its PMC samples and summary (Figure 1)
+  camera_ready/            inputs of the figures redrawn from the retrained runs; see its README
   rebuttal_diagnostics/    the rebuttal-period reliability diagnostics; see its README
 ```
 

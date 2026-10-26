@@ -135,21 +135,28 @@ command name is passed to it.
 
 ## Reproducing the paper
 
-**From the repository alone.** `bash scripts/reproduce_paper.sh` redraws the
-Beta-Bernoulli figures, the identifiability example, and the aggregate
-task-diversity, prior and training-dynamics figures of all three families,
-from the frozen data in [`paper_data/`](paper_data/README.md). It needs no
-checkpoints, GPU or network. Those frozen tables are from the *original* runs;
-several camera-ready figures were redrawn from the retrained runs (no
-positional encoding for linear regression and balls-and-urns, 256-position
-contexts, 32-observation prompts), whose metric tables are not committed.
+**From the repository alone.** `bash scripts/reproduce_paper.sh` redraws,
+with no checkpoints, GPU or network:
+
+- the Beta-Bernoulli figures (Figure 1) and the identifiability example
+  (Figure 2);
+- the camera-ready linear-regression and balls-and-urns task-diversity
+  figures and all 41 reliability figures of Appendix D and the supplement,
+  from the inputs frozen in
+  [`paper_data/camera_ready/`](paper_data/camera_ready/README.md), checked to
+  render pixel-identical to the paper's;
+- the aggregate task-diversity, prior and training-dynamics figures of all
+  three families from the *original* runs in [`paper_data/`](paper_data/README.md).
+  The camera-ready LR and balls-and-urns sweep and prior figures were instead
+  drawn from the retrained runs (no positional encoding, 256-position
+  contexts, 32-observation prompts).
 
 **Everything else** needs outputs of the full experiments: the marginal
-figures read PMC sample bundles, and the reliability appendix
-(`eval.py plot-reliability`) the diagnostics outputs. The code that produces
-them is all here. [`docs/figure_provenance.md`](docs/figure_provenance.md)
-lists, for every figure in the paper and supplement, the command that draws
-it, its inputs and where they live.
+figures read PMC sample bundles, and the camera-ready prior panels the
+sweeps' sidecar CSVs. The code that produces them is all here.
+[`docs/figure_provenance.md`](docs/figure_provenance.md) lists, for every
+figure in the paper and supplement, the command that draws it, its inputs and
+where they live.
 
 **Settings.** All three families use 256 positions, so a rollout is 32 prompt
 observations plus N = 223 generated ones in every setting:
