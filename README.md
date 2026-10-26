@@ -1,7 +1,9 @@
 # BFT-PMC: Predictive Monte Carlo for Bayes-filtered transformers
 
 Code for *What does a Bayes-filtered transformer believe? A predictive Monte
-Carlo approach* (Aswadi, Ma and Wei, NeurIPS 2026).
+Carlo approach* (Aswadi, Ma and Wei, NeurIPS 2026). This is the camera-ready
+release; [Camera-ready release](#camera-ready-release) lists what changed since
+the initial public release.
 
 A **Bayes-filtered transformer** (BFT) is trained on sequences generated in two
 steps: draw a latent task from a prior, then draw observations given the task.
@@ -35,6 +37,8 @@ at M = 32 (right), from the frozen data in `paper_data/`.*
 - [Reproducing the paper](#reproducing-the-paper)
 - [Running the experiments](#running-the-experiments)
 - [Tests](#tests)
+- [Camera-ready release](#camera-ready-release)
+- [Supplementary material](#supplementary-material)
 - [Citation](#citation)
 
 ## Installation
@@ -97,7 +101,7 @@ slurm/                       SLURM jobs for every paper run, with their settings
 tests/                       test suite (100% line coverage)
 pfn_transformers/            vendored PFN TransformerLens library, with its own tests
 assets/                      README figure
-icl2_supplementary.pdf       supplementary figures: every PMC marginal density and CDF
+icl2_supplementary.pdf       the paper's supplement: more reliability diagnostics, every PMC marginal
 ```
 
 Each family package has a README listing its modules:
@@ -138,8 +142,8 @@ command name is passed to it.
 **From the repository alone.** `bash scripts/reproduce_paper.sh` redraws,
 with no checkpoints, GPU or network:
 
-- the Beta-Bernoulli figures (Figure 1) and the identifiability example
-  (Figure 2);
+- the Beta-Bernoulli figures (Figure 1 and the grid of Appendix E) and the
+  identifiability example (Figure 2);
 - the camera-ready linear-regression and balls-and-urns task-diversity
   figures and all 41 reliability figures of Appendix D and the supplement,
   from the inputs frozen in
@@ -168,12 +172,15 @@ observations plus N = 223 generated ones in every setting:
 | 1-Markov | `seq_len = 256`: BOS + 255 states | 224 states |
 
 The sweep evaluations draw 128 prompts with 100 rollouts each for the
-posterior and 1024 rollouts for the prior, identically across families.
+posterior and 1024 rollouts for the prior, identically across families. The
+reliability diagnostics also generate past the trained context, to N = 500,
+by rebuilding each model with a longer context.
 Linear-regression and balls-and-urns models are trained under three
 positional encodings (`--pos-encoding learned`, `rope` or `none`); the Markov
 model uses rotary embeddings throughout. The paper's runs use seed 42, and
 seed 0 for Beta-Bernoulli. The exact commands are in
-[`slurm/train.slurm`](slurm/train.slurm), and the diagnostics settings in
+[`slurm/train.slurm`](slurm/train.slurm), and the diagnostics settings,
+including how each positional encoding is extended, in
 [`slurm/PMC_DIAGNOSTICS.md`](slurm/PMC_DIAGNOSTICS.md).
 
 ## Running the experiments
@@ -209,11 +216,48 @@ fails below 100% line coverage. It trains and evaluates tiny models on the CPU
 and takes about two minutes. Lint and formatting settings are in
 `pyproject.toml` (`uvx ruff check`, `uvx ruff format`).
 
+## Camera-ready release
+
+This version accompanies the camera-ready paper. Since the initial public
+release (commit [`539deb3`](https://github.com/afiq-aswadi/bft-pmc/tree/539deb3),
+July 2026) the repository has gained:
+
+- the PMC reliability diagnostics of Appendix D and the supplement: path
+  stability, and recovery against rollout length, rollout count, latent
+  dimension and task diversity;
+- the Gaussian-against-Laplace prior comparison of Appendix H.1
+  (`eval.py prior-shape`);
+- learned, rotary and no positional encoding for the linear-regression and
+  balls-and-urns models (`--pos-encoding`);
+- models retrained at the camera-ready settings (256 positions, 32-observation
+  prompts), from which several figures were redrawn;
+  [`docs/figure_provenance.md`](docs/figure_provenance.md) says which, and
+  [`paper_data/camera_ready/`](paper_data/camera_ready/README.md) holds their
+  inputs;
+- the camera-ready supplement (next section).
+
+The code also moved into the `bft_pmc` package. `train.py` and `eval.py` are
+still the entry points, and every command of the initial release keeps its
+name. Other paths changed:
+
+| Initial release | Camera-ready |
+| --- | --- |
+| `linear_regression/`, `balls_and_urns/`, `markov/`, `analysis/`, `plotting/`, `metrics.py` | the same names under `bft_pmc/` |
+| `uv run sweeps/run_yaml_sweep.py sweeps/configs/<sweep>.yaml` | `uv run train.py sweep configs/sweeps/<sweep>.yaml` |
+| `markov/train.yaml`, `markov/task_diversity_threshold.yaml` | the same files under `configs/markov/` |
+| `scripts/generate_bau_eval_dataset.py` | `eval.py bau-eval-dataset` |
+| `scripts/compute_lr_prior_delta_mse.py`, `scripts/compute_bau_prior_predictive_kl.py`, `scripts/compute_markov_prior_predictive_kl.py` | `eval.py lr-prior-delta-mse`, `eval.py bau-prior-kl`, `eval.py markov-prior-kl` |
+| `MODEL_ZOO.md`, `paper_data/FIGURE_PROVENANCE.md` | [`docs/model_zoo.md`](docs/model_zoo.md), [`docs/figure_provenance.md`](docs/figure_provenance.md) |
+
 ## Supplementary material
 
-[`icl2_supplementary.pdf`](icl2_supplementary.pdf) collects the full set of
-PMC-recovered marginal densities and CDFs for all three task families at every
-task diversity; the paper shows a representative subset.
+[`icl2_supplementary.pdf`](icl2_supplementary.pdf) is the paper's supplement.
+Its first part extends the reliability diagnostics of Appendix D: prior and
+posterior recovery against rollout length and count for each family at
+horizon N = 223, for linear regression and balls and urns also at N = 500, and
+for the learned and rotary positional-encoding models. The second part gives
+every PMC-recovered marginal density and CDF for all three task families at
+every task diversity; the paper shows a representative subset.
 
 ## Citation
 
