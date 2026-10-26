@@ -234,7 +234,8 @@ July 2026) the repository has gained:
   [`docs/figure_provenance.md`](docs/figure_provenance.md) says which, and
   [`paper_data/camera_ready/`](paper_data/camera_ready/README.md) holds their
   inputs;
-- the camera-ready supplement (next section).
+- the camera-ready supplement, and an interactive one in the browser (next
+  section).
 
 The code also moved into the `bft_pmc` package. `train.py` and `eval.py` are
 still the entry points, and every command of the initial release keeps its
@@ -258,6 +259,14 @@ horizon N = 223, for linear regression and balls and urns also at N = 500, and
 for the learned and rotary positional-encoding models. The second part gives
 every PMC-recovered marginal density and CDF for all three task families at
 every task diversity; the paper shows a representative subset.
+
+The [interactive supplement](https://afiq-aswadi.github.io/bft-pmc/) draws the
+recovered distributions in the browser from PMC samples: pick a task family, a
+task diversity and a prior or posterior, and every coordinate of the latent
+task appears as a density and a CDF against the two references, with a slider
+over rollout length. It also plots the sweep curves and collects the marginal
+figures. Its source is the
+[`gh-pages`](https://github.com/afiq-aswadi/bft-pmc/tree/gh-pages) branch.
 
 ## Citation
 
