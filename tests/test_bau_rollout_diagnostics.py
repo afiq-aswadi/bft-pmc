@@ -8,12 +8,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.path_stability import analyse_bundle
-from analysis.pmc_diagnostics import FIGURE_INDEX, RUN_RECORD, file_sha256
-from analysis.replot_pmc_diagnostics import replot_directory
-from balls_and_urns import train as bau_train
-from balls_and_urns.rollout_diagnostics import DiagnosticsConfig, main
-
+from bft_pmc.analysis.path_stability import analyse_bundle
+from bft_pmc.analysis.pmc_diagnostics import FIGURE_INDEX, RUN_RECORD, file_sha256
+from bft_pmc.analysis.replot_pmc_diagnostics import replot_directory
+from bft_pmc.balls_and_urns.rollout_diagnostics import DiagnosticsConfig, main
 
 SOURCE_FILES = (
     "trajectories.npz",
@@ -24,33 +22,6 @@ SOURCE_FILES = (
     "recovery_vs_count.csv",
     "recovery_vs_count_resamples.csv",
 )
-
-
-@pytest.fixture(scope="module")
-def nope_checkpoint(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """A three-step NoPE model with a 32-token context, saved by the trainer itself."""
-    root = tmp_path_factory.mktemp("bau_nope")
-    bau_train.main(
-        bau_train.TrainConfig(
-            num_tasks=4,
-            vocab_size=4,
-            d_model=8,
-            d_mlp=16,
-            n_layers=1,
-            n_heads=1,
-            d_head=8,
-            n_ctx=32,
-            pos_encoding="none",
-            batch_size=4,
-            seq_len=32,
-            num_steps=3,
-            warmup_steps=0,
-            save_every=3,
-            checkpoint_root=str(root),
-            seed=42,
-        )
-    )
-    return root / "checkpoint_step_3.pt"
 
 
 def _config(checkpoint: Path, output_dir: Path, **overrides: Any) -> DiagnosticsConfig:
@@ -141,9 +112,10 @@ def test_diagnostics_stretch_the_context_of_a_nope_model(
             length_grid=[4, 8, 16, 40],
         )
     )
-    assert json.loads((output_dir / RUN_RECORD).read_text())["context"][
-        "model_context"
-    ] == 64
+    assert (
+        json.loads((output_dir / RUN_RECORD).read_text())["context"]["model_context"]
+        == 64
+    )
     frame = pd.read_csv(output_dir / "posterior_recovery_vs_length.csv")
     assert list(frame["rollout_length"]) == [4, 8, 16, 40]
 
@@ -174,3 +146,28 @@ def test_config_validation_rejects_inconsistent_settings(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         _config(tmp_path / "unused.pt", tmp_path, **overrides).validate()
+
+
+def test_independent_count_pools_give_every_count_its_own_rollouts(
+    nope_checkpoint: Path, tmp_path: Path, saved_figures: list[Path]
+) -> None:
+    """With independent pools even R = num_rollouts gets n_resamples draws."""
+    output_dir = tmp_path / "pools"
+    main(
+        _config(
+            nope_checkpoint,
+            output_dir,
+            prompt_sources=["posterior"],
+            count_grid=[4, 17],
+            independent_count_pools=True,
+        )
+    )
+    resamples = pd.read_csv(output_dir / "posterior_recovery_vs_count_resamples.csv")
+    model = resamples[resamples["kind"] == "model"]
+    draws = model.groupby("num_rollouts")["resample"].nunique().to_dict()
+    assert draws == {r: 3 for r in [4, 17]}
+    counts = pd.read_csv(output_dir / "posterior_recovery_vs_count.csv")
+    endpoint = counts.set_index("num_rollouts").loc[[4, 17][-1]]
+    assert endpoint["dist/sw_vs_baseline_generalising/sd"] > 0
+    record = json.loads((output_dir / RUN_RECORD).read_text())
+    assert record["config"]["independent_count_pools"] is True

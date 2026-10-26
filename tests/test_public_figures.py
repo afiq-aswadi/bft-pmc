@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import math
+import sys
 from dataclasses import replace
 from pathlib import Path
-import sys
 
 import matplotlib
 
@@ -14,17 +14,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from balls_and_urns import plot_dynamics_combined as bau_dynamics
-from balls_and_urns import plot_sweep_combined as bau_sweep
-from balls_and_urns import plot_sweep_prior as bau_prior
-from linear_regression import plot_dynamics_combined as lr_dynamics
-from linear_regression import plot_stitched_sweep_dynamics as lr_stitched
-from linear_regression import plot_sweep_combined as lr_sweep
-from linear_regression import plot_sweep_prior as lr_prior
-from markov import plot_dynamics_combined as markov_dynamics
-from markov import plot_sweep_combined as markov_sweep
-from markov import plot_sweep_prior as markov_prior
-
+from bft_pmc.balls_and_urns import plot_dynamics_combined as bau_dynamics
+from bft_pmc.balls_and_urns import plot_sweep_combined as bau_sweep
+from bft_pmc.balls_and_urns import plot_sweep_prior as bau_prior
+from bft_pmc.linear_regression import plot_dynamics_combined as lr_dynamics
+from bft_pmc.linear_regression import plot_stitched_sweep_dynamics as lr_stitched
+from bft_pmc.linear_regression import plot_sweep_combined as lr_sweep
+from bft_pmc.linear_regression import plot_sweep_prior as lr_prior
+from bft_pmc.markov import plot_dynamics_combined as markov_dynamics
+from bft_pmc.markov import plot_sweep_combined as markov_sweep
+from bft_pmc.markov import plot_sweep_prior as markov_prior
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PAPER_DATA = REPO_ROOT / "paper_data"
@@ -532,9 +531,11 @@ def test_markov_aggregate_plot_edge_paths(
 def test_intro_identifiability_figure_generator(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import scripts.plot_intro_identifiability as intro
+    import bft_pmc.linear_regression.plot_intro_identifiability as intro
 
     out_path = tmp_path / "intro_identifiability_spike_slab.png"
-    monkeypatch.setattr(sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(out_path)])
+    monkeypatch.setattr(
+        sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(out_path)]
+    )
     intro.main()
     assert out_path.is_file()

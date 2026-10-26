@@ -49,7 +49,7 @@ case "${FAMILY}" in
   bau)
     # BAU memorising prompts depend on each run's sampled task pool, so the
     # evaluation dataset is rebuilt from this variant's checkpoints first.
-    python scripts/generate_bau_eval_dataset.py \
+    python eval.py bau-eval-dataset \
       --checkpoint-root "checkpoints/bau/task_diversity_${POS}" \
       --output-dir "outputs/bau/eval_datasets_${POS}" \
       --seq-len 32 --batch-size 128 --alpha-value 1.0 --seed 42 --overwrite

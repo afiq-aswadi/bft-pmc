@@ -3,11 +3,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 import pytest
 
-import analysis.pos_encoding_comparison as comparison
+import bft_pmc.analysis.pos_encoding_comparison as comparison
 
 
 def _write_training_log(path: Path, *, losses: list[float]) -> Path:
@@ -25,7 +24,9 @@ def _write_training_log(path: Path, *, losses: list[float]) -> Path:
     return path
 
 
-def _write_metrics(path: Path, *, offset: float, task_column: str = "num_tasks") -> Path:
+def _write_metrics(
+    path: Path, *, offset: float, task_column: str = "num_tasks"
+) -> Path:
     frame = pd.DataFrame(
         {
             task_column: [1, 2, 1, 2],
@@ -144,7 +145,9 @@ def test_render_summary_handles_either_input() -> None:
     text = comparison.render_summary(losses, None)
     assert "lowest eval loss: rope" in text
 
-    wide = pd.DataFrame({"metric": ["m"], "learned": [1.0], "rope": [2.0], "spread": [1.0]})
+    wide = pd.DataFrame(
+        {"metric": ["m"], "learned": [1.0], "rope": [2.0], "spread": [1.0]}
+    )
     assert "Largest disagreements" in comparison.render_summary(None, wide)
 
 

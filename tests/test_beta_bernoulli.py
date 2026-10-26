@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 import torch
 
-import balls_and_urns.beta_bernoulli as beta_bernoulli
+import bft_pmc.balls_and_urns.beta_bernoulli as beta_bernoulli
 from pfn_transformerlens import PFN, UnsupervisedConfig
 from pfn_transformerlens.model.PFN import UnsupervisedPFN
 
@@ -312,7 +312,9 @@ def test_beta_bernoulli_load_pmc_results_both_schemas(tmp_path: Path) -> None:
     np.testing.assert_array_equal(
         loaded_legacy.posterior_samples, results.posterior_samples
     )
-    np.testing.assert_array_equal(loaded_legacy.posterior_alpha, results.posterior_alpha)
+    np.testing.assert_array_equal(
+        loaded_legacy.posterior_alpha, results.posterior_alpha
+    )
 
 
 def test_beta_bernoulli_main_replot_from_skips_training(

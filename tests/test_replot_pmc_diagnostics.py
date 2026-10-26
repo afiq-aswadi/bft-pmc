@@ -7,21 +7,20 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from analysis.pmc_diagnostics import (
+from bft_pmc.analysis.pmc_diagnostics import (
     FIGURE_INDEX,
     count_curves,
     drift_curves,
     record_figure,
     recovery_curves,
 )
-from analysis.replot_pmc_diagnostics import (
+from bft_pmc.analysis.replot_pmc_diagnostics import (
     ReplotConfig,
     find_figure_indexes,
     main,
     replot_directory,
     replot_figure,
 )
-
 
 GRID = [8, 16, 32]
 BASELINE_NAMES = ("baseline_generalising", "baseline_memorising")

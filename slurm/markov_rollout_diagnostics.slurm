@@ -13,7 +13,7 @@
 # writes them to <output-dir>/run_record.json. CPU only: rollouts of these small
 # models do not need a GPU, and the CPU partition has no per-user GPU cap.
 #
-# --config-path must be the run's own resolved_config.yaml. markov/train.yaml
+# --config-path must be the run's own resolved_config.yaml. configs/markov/train.yaml
 # pins k=10, and without a config path the loader looks for the training chain
 # pool beside the checkpoint, where the trainer does not write it.
 #

@@ -4,17 +4,13 @@
 #   bash scripts/rebuild_marginals.sh
 #
 # Plotting only: no GPU, no checkpoints, no regeneration. Minutes, not hours.
-#
-# Everything is invoked with `python -m` on purpose. Running these scripts by
-# path puts their own directory first on sys.path, where `markov/plotting.py`
-# shadows the top-level `plotting/` package and `balls_and_urns/analysis.py`
-# shadows `analysis/` -- both fail with confusing import errors.
+# Reads the sample bundles under outputs/{lr,bau,markov}/sweep_analysis*/, which
+# the sweep evaluations write (they are not in the repository).
 
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
 source .venv/bin/activate
-export PYTHONPATH=.
 
 PASS=0
 FAIL=0
@@ -38,9 +34,9 @@ for ENC in learned rope none; do
   BAU_SWEEP=$(ls -d outputs/bau/sweep_analysis_"${ENC}"/*/ 2>/dev/null | tail -1)
 
   if [[ -n "${LR_SWEEP}" ]]; then
-    run "lr/${ENC} grid-4dim" python -m linear_regression.plot_marginals \
+    run "lr/${ENC} grid-4dim" python eval.py plot-lr-marginals \
       --sweep-dir "${LR_SWEEP}" --num-dims 4 --output-subdir figures_marginals_4dim
-    run "lr/${ENC} stitched" python -m linear_regression.plot_stitched_marginals \
+    run "lr/${ENC} stitched" python eval.py plot-lr-stitched-marginals \
       --sweep-dir "${LR_SWEEP}" --output-subdir figures_stitched
 
     # lr_1x1_M8_dim0: the manifest does not say which prompt source, so emit all
@@ -49,7 +45,7 @@ for ENC in learned rope none; do
     for SRC in discrete gaussian random; do
       NPZ="${LR_SWEEP}samples/T8_${SRC}_L32.npz"
       if [[ -f "${NPZ}" ]]; then
-        run "lr/${ENC} 1x1 M8 ${SRC}" python -m linear_regression.plot_single_marginal \
+        run "lr/${ENC} 1x1 M8 ${SRC}" python eval.py plot-lr-single-marginal \
           --npz-path "${NPZ}" --dim 0 \
           --out-path "${LR_SWEEP}figures_single/lr_1x1_M8_dim0_${SRC}.pdf"
       fi
@@ -59,9 +55,9 @@ for ENC in learned rope none; do
   fi
 
   if [[ -n "${BAU_SWEEP}" ]]; then
-    run "bau/${ENC} grid-4dim" python -m balls_and_urns.plot_marginals \
+    run "bau/${ENC} grid-4dim" python eval.py plot-bau-marginals \
       --sweep-dir "${BAU_SWEEP}" --num-dims 4 --output-subdir figures_marginals_4dim
-    run "bau/${ENC} stitched" python -m balls_and_urns.plot_stitched_marginals \
+    run "bau/${ENC} stitched" python eval.py plot-bau-stitched-marginals \
       --sweep-dir "${BAU_SWEEP}" --output-subdir figures_stitched
   else
     echo "SKIP  bau/${ENC}: no sweep directory found"
@@ -71,10 +67,10 @@ done
 # ---- Markov matrix marginals (no positional-encoding variants) -------------
 # --prompt-length 32 because this sweep raised the prompt length from 8.
 MARKOV_SAMPLES=outputs/markov/sweep_analysis/samples
-run "markov full" python -m markov.plot_matrix_marginals \
+run "markov full" python eval.py plot-markov-marginals \
   --samples-dir "${MARKOV_SAMPLES}" --prompt-length 32 \
   --out-dir outputs/markov/matrix_marginals
-run "markov K4 (M=4)" python -m markov.plot_matrix_marginals \
+run "markov K4 (M=4)" python eval.py plot-markov-marginals \
   --samples-dir "${MARKOV_SAMPLES}" --prompt-length 32 \
   --max-classes 4 --n-chains 4 --print-frac 0.45 \
   --out-dir outputs/markov/matrix_marginals_K4

@@ -1,0 +1,28 @@
+cff-version: 1.2.0
+message: "If you use this code, please cite the paper."
+title: "bft-pmc: Predictive Monte Carlo analysis of Bayes-filtered transformers"
+type: software
+license: MIT
+repository-code: "https://github.com/afiq-aswadi/bft-pmc"
+authors:
+  - given-names: Afiq Abdillah Effiezal
+    family-names: Aswadi
+    affiliation: Monash University
+  - given-names: Haotong
+    family-names: Ma
+    affiliation: Monash University
+  - given-names: Susan
+    family-names: Wei
+    affiliation: Monash University
+preferred-citation:
+  type: conference-paper
+  title: "What does a Bayes-filtered transformer believe? A predictive Monte Carlo approach"
+  collection-title: "Advances in Neural Information Processing Systems"
+  year: 2026
+  authors:
+    - given-names: Afiq Abdillah Effiezal
+      family-names: Aswadi
+    - given-names: Haotong
+      family-names: Ma
+    - given-names: Susan
+      family-names: Wei

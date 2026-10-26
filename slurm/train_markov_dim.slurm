@@ -5,12 +5,8 @@
 #
 # Normally submitted by slurm/submit_pmc_diagnostics.sh. The command is the
 # camera-ready Markov training in slurm/train.slurm for the markov_M32 run
-# (markov/train.yaml, n_chains 32, seq_len 256), with only the state space k
+# (configs/markov/train.yaml, n_chains 32, seq_len 256), with only the state space k
 # changed. The latent task is the transition matrix: k(k-1) free parameters.
-#
-# Training goes through the root train.py. Running markov/train.py by path puts
-# markov/ first on sys.path, where markov/plotting.py shadows the plotting
-# package, and the job dies at import.
 #
 #SBATCH --job-name=pmc-train-markov-dim
 #SBATCH --partition=gpu
@@ -35,7 +31,7 @@ echo "[$(date +%Y-%m-%dT%H:%M:%S)] host=$(hostname) k=${K}"
 nvidia-smi -L || true
 
 python train.py markov \
-  --config-path markov/train.yaml \
+  --config-path configs/markov/train.yaml \
   --k "${K}" \
   --n-chains 32 \
   --run-name "k${K}" \

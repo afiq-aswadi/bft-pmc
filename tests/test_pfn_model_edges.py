@@ -6,13 +6,6 @@ import pytest
 import torch
 from torch.distributions import Normal
 
-from pfn_transformerlens.model.PFN import (
-    BasePFN,
-    PFNModel,
-    SupervisedPFN,
-    UnsupervisedPFN,
-)
-from pfn_transformerlens.model.PFNMasks import create_custom_mask_hook
 from pfn_transformerlens.model.bucketizer import Bucketizer
 from pfn_transformerlens.model.configs import (
     BasePFNConfig,
@@ -20,6 +13,13 @@ from pfn_transformerlens.model.configs import (
     SupervisedRegressionPFNConfig,
     UnsupervisedPFNConfig,
 )
+from pfn_transformerlens.model.PFN import (
+    BasePFN,
+    PFNModel,
+    SupervisedPFN,
+    UnsupervisedPFN,
+)
+from pfn_transformerlens.model.PFNMasks import create_custom_mask_hook
 
 
 def _common() -> dict[str, object]:

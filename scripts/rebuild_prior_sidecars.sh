@@ -17,7 +17,6 @@ set -uo pipefail
 
 cd "$(dirname "$0")/.."
 source .venv/bin/activate
-export PYTHONPATH=.
 
 PASS=0
 FAIL=0
@@ -40,14 +39,14 @@ for ENC in learned rope none; do
   BAU_SWEEP=$(ls -d outputs/bau/sweep_analysis_"${ENC}"/*/ 2>/dev/null | tail -1)
 
   if [[ -n "${LR_SWEEP}" ]]; then
-    run "lr/${ENC} prior delta mse" python scripts/compute_lr_prior_delta_mse.py \
+    run "lr/${ENC} prior delta mse" python eval.py lr-prior-delta-mse \
       --checkpoint-root "checkpoints/lr/task_diversity_${ENC}" \
       --noise-std 0.5 --seed 42 \
       --out-csv "${LR_SWEEP}prior_delta_mse.csv"
   fi
 
   if [[ -n "${BAU_SWEEP}" ]]; then
-    run "bau/${ENC} prior predictive kl" python scripts/compute_bau_prior_predictive_kl.py \
+    run "bau/${ENC} prior predictive kl" python eval.py bau-prior-kl \
       --checkpoint-root "checkpoints/bau/task_diversity_${ENC}" \
       --alpha-value 1.0 \
       --out-csv "${BAU_SWEEP}prior_predictive_kl.csv"

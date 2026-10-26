@@ -7,12 +7,12 @@ import pytest
 import torch
 from torch import nn
 
-import analysis.checkpoints as checkpoint_helpers
-from linear_regression.analysis.config import SweepConfig
-import linear_regression.analysis.data as analysis_data
-import linear_regression.analysis.metrics as analysis_metrics
-from linear_regression.analysis.data import PromptData
-from linear_regression.priors import DiscretePrior
+import bft_pmc.analysis.checkpoints as checkpoint_helpers
+import bft_pmc.linear_regression.analysis.data as analysis_data
+import bft_pmc.linear_regression.analysis.metrics as analysis_metrics
+from bft_pmc.linear_regression.analysis.config import SweepConfig
+from bft_pmc.linear_regression.analysis.data import PromptData
+from bft_pmc.linear_regression.priors import DiscretePrior
 from pfn_transformerlens.model.PFN import DistributionPrediction
 
 
@@ -49,9 +49,7 @@ def _fake_pmc(
         betas = np.zeros((forward_recursion_samples, model.task_size))
         rollout_shape = (forward_recursion_samples, forward_recursion_steps)
     else:
-        betas = np.zeros(
-            (init_x.shape[0], forward_recursion_samples, model.task_size)
-        )
+        betas = np.zeros((init_x.shape[0], forward_recursion_samples, model.task_size))
         rollout_shape = (
             init_x.shape[0],
             forward_recursion_samples,
@@ -381,7 +379,7 @@ def test_lr_all_predictive_metrics_and_result_merging(
 
 
 def test_sweep_config_rejects_non_positive_chunking() -> None:
-    from linear_regression.analysis.config import SweepConfig
+    from bft_pmc.linear_regression.analysis.config import SweepConfig
 
     with pytest.raises(ValueError, match="chunk_size"):
         SweepConfig(chunk_size=0).validate()

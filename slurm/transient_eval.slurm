@@ -36,7 +36,6 @@
 set -euo pipefail
 
 source .venv/bin/activate
-export PYTHONPATH=.
 export OMP_NUM_THREADS=${SLURM_CPUS_PER_TASK:-8}
 export PYTHONUNBUFFERED=1
 # The chunk-32 OOM reported 12.45 GiB reserved-but-unallocated: fragmentation,
@@ -92,7 +91,7 @@ echo "[$(date +%Y-%m-%dT%H:%M:%S)] ${FAMILY}/${POS}: $(find "${CKPT_ROOT}/${RUN_
 
 case "${FAMILY}" in
   lr)
-    python -m linear_regression.distribution_dynamics \
+    python eval.py lr-dynamics \
       --run-id "${RUN_ID}" \
       --checkpoint-root "${CKPT_ROOT}" \
       --prompt-length 32 --n-prompts 128 --n-samples 100 \
@@ -103,7 +102,7 @@ case "${FAMILY}" in
       --seed 42 --output-dir "${OUT_DIR}"
     ;;
   bau)
-    python -m balls_and_urns.distribution_dynamics \
+    python eval.py bau-dynamics \
       --run-id "${RUN_ID}" \
       --checkpoint-root "${CKPT_ROOT}" \
       --eval-dataset-dir "outputs/bau/eval_datasets_${POS}" \

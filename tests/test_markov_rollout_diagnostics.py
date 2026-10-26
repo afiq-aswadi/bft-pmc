@@ -5,16 +5,13 @@ from pathlib import Path
 from typing import Any
 
 import numpy as np
+import pandas as pd
 import pytest
-import torch
 
-from analysis.path_stability import analyse_bundle
-from analysis.pmc_diagnostics import FIGURE_INDEX, RUN_RECORD, file_sha256
-from analysis.replot_pmc_diagnostics import replot_directory
-from markov.config import MarkovConfig, dump_config
-from markov.data import MarkovChainDataset
-from markov.model import MarkovTransformer
-from markov.rollout_diagnostics import (
+from bft_pmc.analysis.path_stability import analyse_bundle
+from bft_pmc.analysis.pmc_diagnostics import FIGURE_INDEX, RUN_RECORD, file_sha256
+from bft_pmc.analysis.replot_pmc_diagnostics import replot_directory
+from bft_pmc.markov.rollout_diagnostics import (
     MarkovDiagnosticsConfig,
     check_rollouts_fit_context,
     main,
@@ -57,36 +54,9 @@ def test_prior_only_runs_ignore_the_prompt_length() -> None:
         )
 
 
-@pytest.fixture
-def tiny_run(tmp_path: Path) -> Path:
-    """An untrained k=2 model with an 8-state context, saved as a training run."""
-    config = MarkovConfig(
-        k=2,
-        seq_len=8,
-        n_chains=2,
-        batch_size=2,
-        d_model=4,
-        num_layers=1,
-        num_heads=2,
-        expansion_factor=2,
-        context_len=3,
-        num_eval_trials=1,
-    )
-    dataset = MarkovChainDataset(2, 8, 2, "cpu", seed=config.seed)
-    model = MarkovTransformer(3, 4, 8, 1, 2, 2, config.rope_theta)
-    run_dir = tmp_path / "run"
-    run_dir.mkdir()
-    torch.save(model.state_dict(), run_dir / "model.pt")
-    dump_config(config, run_dir / "resolved_config.yaml")
-    np.save(run_dir / "transition_matrices.npy", dataset.transition_matrices.numpy())
-    np.save(
-        run_dir / "stationary_distributions.npy",
-        dataset.stationary_distributions.numpy(),
-    )
-    return run_dir
-
-
-def _config(run_dir: Path, output_dir: Path, **overrides: Any) -> MarkovDiagnosticsConfig:
+def _config(
+    run_dir: Path, output_dir: Path, **overrides: Any
+) -> MarkovDiagnosticsConfig:
     settings: dict[str, Any] = {
         "checkpoint_path": str(run_dir / "model.pt"),
         "config_path": str(run_dir / "resolved_config.yaml"),
@@ -179,6 +149,7 @@ def test_diagnostics_refuse_to_overrun_the_context_before_any_rollout(
         ({"anchor_length": 3}, "anchor_length"),
         ({"jellyfish_prompts": 0}, "jellyfish_prompts"),
         ({"prompt_sources": ["posterior", "middle"]}, "Unknown prompt sources"),
+        ({"rope_scaling": "stretch"}, "Unknown rope_scaling"),
     ],
 )
 def test_config_validation_rejects_inconsistent_settings(
@@ -186,3 +157,28 @@ def test_config_validation_rejects_inconsistent_settings(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         _config(tmp_path, tmp_path, **overrides).validate()
+
+
+def test_independent_count_pools_give_every_count_its_own_rollouts(
+    tiny_run: Path, tmp_path: Path, saved_figures: list[Path]
+) -> None:
+    """With independent pools even R = num_rollouts gets n_resamples draws."""
+    output_dir = tmp_path / "pools"
+    main(
+        _config(
+            tiny_run,
+            output_dir,
+            prompt_sources=["posterior"],
+            count_grid=[3, 9],
+            independent_count_pools=True,
+        )
+    )
+    resamples = pd.read_csv(output_dir / "posterior_recovery_vs_count_resamples.csv")
+    model = resamples[resamples["kind"] == "model"]
+    draws = model.groupby("num_rollouts")["resample"].nunique().to_dict()
+    assert draws == {r: 2 for r in [3, 9]}
+    counts = pd.read_csv(output_dir / "posterior_recovery_vs_count.csv")
+    endpoint = counts.set_index("num_rollouts").loc[[3, 9][-1]]
+    assert endpoint["dist/sw_vs_baseline_generalising/sd"] > 0
+    record = json.loads((output_dir / RUN_RECORD).read_text())
+    assert record["config"]["independent_count_pools"] is True

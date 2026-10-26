@@ -7,7 +7,7 @@ import matplotlib
 import numpy as np
 import pytest
 
-import scripts.plot_intro_identifiability as figure2
+import bft_pmc.linear_regression.plot_intro_identifiability as figure2
 
 
 @pytest.fixture(scope="module")
@@ -38,7 +38,10 @@ def test_calibration_makes_the_two_posterior_means_identical(slab_var: float) ->
 
 
 def test_point_predictions_coincide_at_the_orthogonal_query(slab_var: float) -> None:
-    for components in (figure2.gaussian_posterior(), figure2.spike_slab_posterior(slab_var)):
+    for components in (
+        figure2.gaussian_posterior(),
+        figure2.spike_slab_posterior(slab_var),
+    ):
         prediction = figure2.X_QUERY @ figure2.posterior_mean(components)
         assert prediction == pytest.approx(0.0, abs=1e-12)
 
@@ -77,7 +80,9 @@ def test_main_draws_the_figure(
     tmp_path: Path,
 ) -> None:
     out_path = tmp_path / "figure.png"
-    monkeypatch.setattr(sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(out_path)])
+    monkeypatch.setattr(
+        sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(out_path)]
+    )
     with matplotlib.rc_context():
         figure2.main()
     assert saved_figures == [out_path]
@@ -89,7 +94,9 @@ def test_main_refuses_posteriors_whose_means_differ(
 ) -> None:
     monkeypatch.setattr(figure2, "calibrated_slab_variance", lambda: 1.0)
     monkeypatch.setattr(
-        sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(tmp_path / "figure.png")]
+        sys,
+        "argv",
+        ["plot_intro_identifiability.py", "--out-path", str(tmp_path / "figure.png")],
     )
     with pytest.raises(AssertionError, match="posterior means differ"):
         figure2.main()

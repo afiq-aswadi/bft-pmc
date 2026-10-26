@@ -13,10 +13,9 @@ from pathlib import Path
 import pytest
 import torch
 
-from markov.analysis_common import load_trained_markov_artifacts
-from markov.config import MarkovConfig, dump_config
-from markov.model import MarkovTransformer, precompute_rotary_frequencies
-
+from bft_pmc.markov.analysis_common import load_trained_markov_artifacts
+from bft_pmc.markov.config import MarkovConfig, dump_config
+from bft_pmc.markov.model import MarkovTransformer, precompute_rotary_frequencies
 
 TRAINED_SEQ_LEN = 32
 EXTENDED_SEQ_LEN = 64
@@ -68,7 +67,9 @@ def test_interpolation_keeps_every_angle_inside_the_trained_range() -> None:
     torch.testing.assert_close(interpolated_cos[:: int(1 / scale)], trained_cos)
 
     extrapolated_cos, _ = precompute_rotary_frequencies(8, EXTENDED_SEQ_LEN, 10000.0)
-    assert not torch.equal(extrapolated_cos[TRAINED_SEQ_LEN:], interpolated_cos[TRAINED_SEQ_LEN:])
+    assert not torch.equal(
+        extrapolated_cos[TRAINED_SEQ_LEN:], interpolated_cos[TRAINED_SEQ_LEN:]
+    )
 
 
 def test_interpolation_also_moves_the_trained_positions() -> None:
@@ -145,3 +146,8 @@ def test_an_unknown_scaling_mode_is_refused(tmp_path: Path) -> None:
             seq_len_override=EXTENDED_SEQ_LEN,
             rope_scaling="yarn",
         )
+
+
+def test_rotary_position_scale_must_be_positive() -> None:
+    with pytest.raises(ValueError, match="position_scale must be positive"):
+        precompute_rotary_frequencies(8, TRAINED_SEQ_LEN, 10000.0, position_scale=0.0)

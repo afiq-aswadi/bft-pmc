@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from markov.run_names import parse_n_chains
+from bft_pmc.markov.run_names import parse_n_chains
 
 
 def test_parses_both_naming_conventions() -> None:

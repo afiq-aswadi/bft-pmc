@@ -5,6 +5,11 @@ description = "Predictive Monte Carlo analysis of Bayes-filtered transformers"
 readme = "README.md"
 requires-python = ">=3.13"
 license = "MIT"
+authors = [
+    { name = "Afiq Abdillah Effiezal Aswadi" },
+    { name = "Haotong Ma" },
+    { name = "Susan Wei" },
+]
 dependencies = [
     "einops>=0.8.0",
     "jaxtyping>=0.3.3",
@@ -32,11 +37,15 @@ dev = [
     "pytest-cov>=7.0.0",
 ]
 
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["bft_pmc"]
+
 [tool.uv.sources]
 pfn-transformerlens = { path = "pfn_transformers", editable = true }
-
-[tool.uv]
-package = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests", "pfn_transformers/tests"]
@@ -54,6 +63,8 @@ omit = [
     "tests/*",
     "pfn_transformers/tests/*",
     "pfn_transformers/cookbooks/*",
+    ".venv/*",
+    "outputs/*",
 ]
 
 [tool.coverage.report]
@@ -61,10 +72,20 @@ fail_under = 100
 show_missing = true
 skip_covered = true
 
-[tool.ruff.lint]
-ignore = ["ANN002", "ANN003", "F821", "F722"]
+[tool.ruff]
+line-length = 88
+target-version = "py313"
+extend-exclude = ["outputs"]
 
-# pyproject.toml
+[tool.ruff.lint]
+# Pyflakes, syntax and import errors, plus import sorting.
+select = ["E4", "E7", "E9", "F", "I"]
+# F722/F821: jaxtyping shape strings such as Float[Tensor, "batch seq"].
+ignore = ["F821", "F722"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["bft_pmc", "pfn_transformerlens"]
+
 [tool.ty.rules]
 # keep global defaults; tweak per-folder below
 unresolved-attribute = "ignore"
@@ -95,8 +116,8 @@ unsupported-operator = "ignore"
 
 [[tool.ty.overrides]]
 include = [
-    "linear_regression/analysis/runner.py",
-    "linear_regression/distribution_dynamics.py",
+    "bft_pmc/linear_regression/analysis/runner.py",
+    "bft_pmc/linear_regression/distribution_dynamics.py",
 ]
 [tool.ty.overrides.rules]
 # NumPy's savez stub reserves allow_pickle inside arbitrary keyword mappings.

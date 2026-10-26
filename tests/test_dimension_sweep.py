@@ -6,8 +6,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-from analysis import dimension_sweep
-from analysis.dimension_sweep import (
+from bft_pmc.analysis import dimension_sweep
+from bft_pmc.analysis.dimension_sweep import (
     TITLE_WIDTH,
     DimensionSweepConfig,
     collect,
@@ -17,7 +17,6 @@ from analysis.dimension_sweep import (
     parse_inputs,
     plot,
 )
-
 
 LENGTHS = [8, 64, 500]
 

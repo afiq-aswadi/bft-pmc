@@ -42,18 +42,18 @@ echo "[$(date +%Y-%m-%dT%H:%M:%S)] host=$(hostname)"
 
 echo
 echo "=== alignment self-test (no checkpoint) ==="
-python scripts/predictive_fidelity.py --self-test
+python eval.py predictive-fidelity --self-test
 
 echo
 echo "=== balls-and-urns, M=32, no positional encoding ==="
-python scripts/predictive_fidelity.py --family bau \
+python eval.py predictive-fidelity --family bau \
   --checkpoint-paths "checkpoints/bau/task_diversity_none/M32/checkpoint_step_${FINAL_STEP}.pt" \
   --seq-len 500 --n-ctx-override 1024 --n-sequences 256 --batch-size 64 \
   --seed 42 --output-dir "${OUT}"
 
 echo
 echo "=== 1-Markov, M=32, rotary position interpolation 256/544 ==="
-python scripts/predictive_fidelity.py --family markov \
+python eval.py predictive-fidelity --family markov \
   --checkpoint-paths "checkpoints/markov/task_diversity/markov_M32/checkpoint_step_${FINAL_STEP}.pt" \
   --config-path outputs/markov/training/markov_M32/resolved_config.yaml \
   --seq-len 500 --seq-len-override 544 --rope-scaling interpolate \

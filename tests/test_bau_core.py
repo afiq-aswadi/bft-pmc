@@ -5,7 +5,7 @@ import pytest
 import torch
 from torch import nn
 
-from balls_and_urns.baselines import (
+from bft_pmc.balls_and_urns.baselines import (
     dirichlet_posterior_alpha,
     discrete_posterior_weights,
     generalising_predictive,
@@ -13,13 +13,13 @@ from balls_and_urns.baselines import (
     sample_generalising_posterior,
     sample_memorising_posterior,
 )
-from balls_and_urns.data import (
+from bft_pmc.balls_and_urns.data import (
     BOSGenerator,
     make_bau_generator,
     make_discrete_bau_generator,
     make_generator_from_pool,
 )
-from balls_and_urns.dataset import (
+from bft_pmc.balls_and_urns.dataset import (
     load_generalising_dataset,
     load_memorising_dataset,
     load_predictive_samples,
@@ -27,8 +27,13 @@ from balls_and_urns.dataset import (
     save_memorising_dataset,
     save_predictive_samples,
 )
-from balls_and_urns.evals import BAUEvaluator, _cross_entropy, _mse, _per_position_ce
-from balls_and_urns.predictive_monte_carlo import (
+from bft_pmc.balls_and_urns.evals import (
+    BAUEvaluator,
+    _cross_entropy,
+    _mse,
+    _per_position_ce,
+)
+from bft_pmc.balls_and_urns.predictive_monte_carlo import (
     predictive_monte_carlo_theta,
     predictive_monte_carlo_theta_chunked,
 )

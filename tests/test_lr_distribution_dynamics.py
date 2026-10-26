@@ -9,7 +9,7 @@ import pytest
 import torch
 from torch import nn
 
-import linear_regression.distribution_dynamics as dynamics
+import bft_pmc.linear_regression.distribution_dynamics as dynamics
 
 
 class DynamicsModel(nn.Module):

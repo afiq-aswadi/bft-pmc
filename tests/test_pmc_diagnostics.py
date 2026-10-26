@@ -8,9 +8,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import torch
 
-from analysis import pmc_diagnostics
-from analysis.pmc_diagnostics import (
+from bft_pmc.analysis import pmc_diagnostics
+from bft_pmc.analysis.pmc_diagnostics import (
     FIGURE_INDEX,
     RUN_RECORD,
     check_rollouts_fit_context,
@@ -18,6 +19,7 @@ from analysis.pmc_diagnostics import (
     count_curves_with_resamples,
     distance_metrics,
     drift_curves,
+    on_isolated_torch_stream,
     plot_counts,
     plot_drift,
     plot_recovery,
@@ -26,7 +28,6 @@ from analysis.pmc_diagnostics import (
     save_path_stability_bundle,
     write_run_record,
 )
-
 
 BASELINE_NAMES = ("baseline_generalising", "baseline_memorising")
 GRID = [8, 16, 32]
@@ -205,7 +206,9 @@ def test_a_balls_and_urns_rollout_may_fill_the_context() -> None:
         prompt_sources=["prior", "posterior"],
         context_length=256,
     )
-    with pytest.raises(ValueError, match=r"prompt of 16 needs 257 positions.*--steps 240"):
+    with pytest.raises(
+        ValueError, match=r"prompt of 16 needs 257 positions.*--steps 240"
+    ):
         check_rollouts_fit_context(
             steps=241,
             prompt_length=16,
@@ -243,7 +246,12 @@ def test_path_stability_bundle_is_named_after_the_run(tmp_path: Path) -> None:
     )
     assert path == run_dir / "bau_m32_learned_rollouts.npz"
     with np.load(path) as archive:
-        assert set(archive.files) == {"prompt_len", "rollout_tokens", "num_tasks", "step"}
+        assert set(archive.files) == {
+            "prompt_len",
+            "rollout_tokens",
+            "num_tasks",
+            "step",
+        }
         assert int(archive["prompt_len"]) == 2
         assert int(archive["step"]) == 100000
 
@@ -301,7 +309,10 @@ def test_run_record_saves_config_context_and_provenance(
 def test_file_sha256_hashes_bytes_and_skips_missing_files(tmp_path: Path) -> None:
     path = tmp_path / "blob.bin"
     path.write_bytes(bytes(range(256)) * 5000)
-    assert pmc_diagnostics.file_sha256(path) == hashlib.sha256(path.read_bytes()).hexdigest()
+    assert (
+        pmc_diagnostics.file_sha256(path)
+        == hashlib.sha256(path.read_bytes()).hexdigest()
+    )
     assert pmc_diagnostics.file_sha256(tmp_path / "missing.bin") is None
 
 
@@ -360,7 +371,11 @@ def test_record_figure_merges_entries_into_the_index(tmp_path: Path) -> None:
             "csv": "d.csv",
             "paths": "d.npz",
         },
-        "prior_recovery_vs_length": {"kind": "recovery", "title": "new", "csv": "a.csv"},
+        "prior_recovery_vs_length": {
+            "kind": "recovery",
+            "title": "new",
+            "csv": "a.csv",
+        },
     }
 
 
@@ -402,3 +417,40 @@ def test_plot_counts_writes_both_formats(
     )
     plot_counts(frame, tmp_path / "counts", "counts")
     assert [path.suffix for path in saved_figures] == [".png", ".pdf"]
+
+
+def test_isolated_stream_keeps_its_own_draws_and_restores_the_global_stream() -> None:
+    sampler = on_isolated_torch_stream(lambda n: torch.rand(n), seed=123)
+
+    torch.manual_seed(0)
+    expected_global = torch.rand(3)
+    torch.manual_seed(0)
+    first, second = sampler(2), sampler(2)
+    # The global stream continues as if the sampler had never run ...
+    assert torch.equal(torch.rand(3), expected_global)
+    # ... while the sampler continues its own seeded stream across calls.
+    torch.manual_seed(123)
+    assert torch.equal(torch.cat([first, second]), torch.rand(4))
+
+
+def test_isolated_stream_saves_and_restores_cuda_state_too(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    cuda_state = {"value": "global"}
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "get_rng_state_all", lambda: cuda_state["value"])
+    monkeypatch.setattr(
+        torch.cuda, "set_rng_state_all", lambda state: cuda_state.update(value=state)
+    )
+
+    def sampler() -> str:
+        seen = cuda_state["value"]
+        cuda_state["value"] = "advanced by the sampler"
+        return seen
+
+    wrapped = on_isolated_torch_stream(sampler, seed=7)
+    assert wrapped() == "global"  # first call seeds, nothing restored yet
+    assert cuda_state["value"] == "global"
+    # The second call resumes the sampler's own CUDA state.
+    assert wrapped() == "advanced by the sampler"
+    assert cuda_state["value"] == "global"

@@ -10,10 +10,13 @@ import pytest
 import torch
 from torch import nn
 
-import balls_and_urns.analysis as bau_analysis
-from balls_and_urns.dataset import save_generalising_dataset, save_memorising_dataset
-import balls_and_urns.distribution_dynamics as bau_dynamics
-import balls_and_urns.sweep_analysis as bau_sweep
+import bft_pmc.balls_and_urns.analysis as bau_analysis
+import bft_pmc.balls_and_urns.distribution_dynamics as bau_dynamics
+import bft_pmc.balls_and_urns.sweep_analysis as bau_sweep
+from bft_pmc.balls_and_urns.dataset import (
+    save_generalising_dataset,
+    save_memorising_dataset,
+)
 from pfn_transformerlens.model.PFN import DistributionPrediction
 
 
@@ -52,9 +55,7 @@ def _fake_theta_pmc(
     del kwargs
     thetas = np.full((num_rollouts, vocab_size), 1.0 / vocab_size)
     if save_rollouts:
-        return thetas, np.zeros(
-            (num_rollouts, forward_recursion_steps), dtype=np.int16
-        )
+        return thetas, np.zeros((num_rollouts, forward_recursion_steps), dtype=np.int16)
     return thetas
 
 
@@ -319,8 +320,7 @@ def test_bau_sweep_analysis_modes_and_errors(
         "data_memorising",
     }
     assert {
-        path.name
-        for path in (tmp_path / "output" / "samples").glob("*_rollouts.npz")
+        path.name for path in (tmp_path / "output" / "samples").glob("*_rollouts.npz")
     } == {
         "run__source_prior_rollouts.npz",
         "run__source_data_generalising_rollouts.npz",
@@ -475,9 +475,7 @@ def test_bau_dynamics_analysis_and_main(
     assert task_count == 2
     assert metrics["step"].tolist() == [1, 3]
     # three prompt sources per analysed checkpoint, each with a rollout bundle
-    assert (
-        len(list((tmp_path / "output/run/samples").glob("*_rollouts.npz"))) == 6
-    )
+    assert len(list((tmp_path / "output/run/samples").glob("*_rollouts.npz"))) == 6
     assert not per_prompt.empty
     assert "delta_vs_baseline_memorising_on_data_memorising" in metrics
 

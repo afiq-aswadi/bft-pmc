@@ -8,7 +8,7 @@
 # zero-mean Gaussian prior from a variance-matched zero-mean Laplace prior,
 # where the prediction-space comparison provably cannot (both have mean zero,
 # so both give the same prior point prediction). At the camera-ready budget of
-# R = 1024 that test has almost no power: scripts/prior_shape_discrimination.py
+# R = 1024 that test has almost no power: bft_pmc/linear_regression/prior_shape_discrimination.py
 # shows a *true* Gaussian sample of that size separates the two references by
 # only ~2 sigma, because they differ solely in kurtosis and tails. These runs
 # raise R so the test can actually resolve the question.
@@ -25,15 +25,15 @@
 #
 # Only the prior is generated (--prompt-sources prior). The in-job recovery and
 # count panels are trimmed to the minimum the entrypoint will accept, since the
-# analysis is done afterwards by scripts/prior_shape_discrimination.py from the
+# analysis is done afterwards by bft_pmc/linear_regression/prior_shape_discrimination.py from the
 # saved rollouts:
 #   --length-grid 16 223   anchor_length must be a grid entry, hence the 16
 #   --count-grid 1024      the count panel is not used here
 #   --n-resamples 1        likewise
 #
 # After the jobs land, pull and analyse on the Mac:
-#   bash scripts/pull_pmc_diagnostics_from_m3.sh
-#   python3 scripts/prior_shape_discrimination.py \
+#   bash scripts/m3/pull_pmc_diagnostics.sh
+#   python eval.py prior-shape \
 #     --run-template 'lr_m{m}_none_prior_r8192' --length 223
 
 set -euo pipefail

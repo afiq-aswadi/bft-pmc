@@ -47,12 +47,12 @@ echo "[$(date +%Y-%m-%dT%H:%M:%S)] host=$(hostname)"
 
 echo
 echo "=================== raw (as recovered) ==================="
-python scripts/prior_shape_discrimination.py "${COMMON[@]}" \
+python eval.py prior-shape "${COMMON[@]}" \
   --output-dir outputs/prior_shape/raw
 
 echo
 echo "============ variance-matched (shape only) ==============="
-python scripts/prior_shape_discrimination.py "${COMMON[@]}" \
+python eval.py prior-shape "${COMMON[@]}" \
   --match-variance --output-dir outputs/prior_shape/matched
 
 echo

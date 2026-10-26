@@ -8,9 +8,9 @@ import pytest
 import torch
 from torch import nn
 
-from markov.data import MarkovChainDataset
-import markov.samples_saving as samples_saving
-from analysis.rollouts import rollout_bundle_path
+import bft_pmc.markov.samples_saving as samples_saving
+from bft_pmc.analysis.rollouts import rollout_bundle_path
+from bft_pmc.markov.data import MarkovChainDataset
 
 
 class SampleModel(nn.Module):

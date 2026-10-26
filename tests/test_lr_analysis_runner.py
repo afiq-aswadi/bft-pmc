@@ -8,14 +8,14 @@ import pytest
 import torch
 from torch import nn
 
-from linear_regression.analysis.config import SweepConfig
-from linear_regression.analysis.data import (
+import bft_pmc.linear_regression.analysis.runner as runner
+from bft_pmc.linear_regression.analysis.config import SweepConfig
+from bft_pmc.linear_regression.analysis.data import (
     PromptData,
     save_prior_dataset,
     save_shared_dataset,
 )
-import linear_regression.analysis.runner as runner
-from linear_regression.priors import DiscretePrior
+from bft_pmc.linear_regression.priors import DiscretePrior
 
 
 class RunnerModel(nn.Module):

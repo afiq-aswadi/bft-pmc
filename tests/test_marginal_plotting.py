@@ -1,21 +1,21 @@
 from __future__ import annotations
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pytest
 from scipy.stats import norm
 
-from balls_and_urns.dataset import save_predictive_samples
-from balls_and_urns import plot_marginals as bau_marginals
-from balls_and_urns import plot_stitched_marginals as bau_stitched
-from linear_regression import plot_marginals as lr_marginals
-from linear_regression import plot_single_marginal as lr_single
-from linear_regression import plot_stitched_marginals as lr_stitched
-from markov import plot_matrix_marginals as markov_matrix
-from plotting.marginal_cell import (
+from bft_pmc.balls_and_urns import plot_marginals as bau_marginals
+from bft_pmc.balls_and_urns import plot_stitched_marginals as bau_stitched
+from bft_pmc.balls_and_urns.dataset import save_predictive_samples
+from bft_pmc.linear_regression import plot_marginals as lr_marginals
+from bft_pmc.linear_regression import plot_single_marginal as lr_single
+from bft_pmc.linear_regression import plot_stitched_marginals as lr_stitched
+from bft_pmc.markov import plot_matrix_marginals as markov_matrix
+from bft_pmc.plotting.marginal_cell import (
     _analytic_peak,
     _validate_cell_inputs,
     cell_xrange,

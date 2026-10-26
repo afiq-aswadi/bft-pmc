@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pandas as pd
 
-from markov.kl_history import load_kl_history
+from bft_pmc.markov.kl_history import load_kl_history
 
 
 def _write_training_log(path: Path) -> None:

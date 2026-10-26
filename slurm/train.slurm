@@ -114,7 +114,7 @@ case "${FAMILY}" in
     ;;
   markov)
     python train.py markov \
-      --config-path markov/train.yaml \
+      --config-path configs/markov/train.yaml \
       --n-chains "${N_CHAINS}" \
       --run-name "markov_M${N_CHAINS}" \
       --checkpoint-root checkpoints/markov/task_diversity \

@@ -6,8 +6,14 @@ import matplotlib
 
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
+import pytest
 
-from plotting.paper_style import OddPowerOfTwoLocator, task_diversity_ticks
+from bft_pmc.plotting.paper_style import (
+    DecadeLocator,
+    OddPowerOfTwoLocator,
+    every_decade_ticks,
+    task_diversity_ticks,
+)
 
 
 def _powers(values: list[float]) -> list[int]:
@@ -46,3 +52,31 @@ def test_task_diversity_ticks_drives_a_live_axis() -> None:
     task_diversity_ticks(axes.xaxis)
     assert _powers(list(axes.get_xticks())) == [3, 5, 7, 9, 11]
     plt.close(figure)
+
+
+@pytest.mark.parametrize(
+    ("limits", "expected"),
+    [
+        ((1.0, 1000.0), [1.0, 10.0, 100.0, 1000.0]),  # within budget: every decade
+        ((1.0, 1e5), [1.0, 100.0, 10000.0]),  # six decades: every second
+        ((1e5, 1.0), [1.0, 100.0, 10000.0]),  # reversed limits
+        ((0.0, 10.0), []),  # a log axis cannot show zero
+        ((1.0, float("inf")), []),
+    ],
+)
+def test_decade_locator_thins_decades_to_the_tick_budget(
+    limits: tuple[float, float], expected: list[float]
+) -> None:
+    assert DecadeLocator(max_ticks=4).tick_values(*limits) == expected
+
+
+def test_every_decade_ticks_caps_the_label_count_when_asked() -> None:
+    fig, ax = plt.subplots()
+    ax.set_xscale("log")
+    ax.set_xlim(1.0, 1e5)
+    every_decade_ticks(ax.xaxis, max_ticks=4)
+    assert isinstance(ax.xaxis.get_major_locator(), DecadeLocator)
+    assert list(ax.get_xticks()) == [1.0, 100.0, 10000.0]
+    every_decade_ticks(ax.xaxis)
+    assert not isinstance(ax.xaxis.get_major_locator(), DecadeLocator)
+    plt.close(fig)

@@ -1,12 +1,20 @@
-# Running the sweeps on SLURM
+# Running the experiments on SLURM
 
-Three job files, submitted in order. Everything runs from the **repository root**.
+The job scripts behind every run in the paper. Submit everything from the
+**repository root**; each job calls `python train.py` or `python eval.py` from
+the activated `.venv`. Steps 0 to 4 below are the task-diversity pipeline,
+step 5 the reliability diagnostics of Appendix D, and step 6 the remaining
+appendix experiments.
 
-| File | What it does | Resources |
+| Group | Files | What they do |
 | --- | --- | --- |
-| `train.slurm` | Trains one task family as a job array | 1 GPU per task |
-| `analyse.slurm` | Evaluates checkpoints, writes metrics + PMC sample/rollout bundles | 1 GPU per task |
-| `path_stability.slurm` | Path-stability (jellyfish) diagnostic from saved rollouts | CPU only |
+| Task-diversity pipeline | `train.slurm`, `analyse.slurm`, `path_stability.slurm`, `submit_all.sh` | train every family as a job array (1 GPU per task), evaluate the checkpoints (1 GPU per task), draw the path-stability plot (CPU) |
+| Reliability diagnostics | `submit_pmc_diagnostics.sh` and the jobs it submits: `{lr,bau,markov}_rollout_diagnostics.slurm`, `lr_rollout_diagnostics_cpu.slurm`, `pmc_jellyfish.slurm`, `aggregate_dimension_sweep.slurm`, `train_bau_vocab.slurm`, `train_markov_dim.slurm`; follow-ups `submit_markov_dim_sweep.sh`, `submit_markov_n500.sh`, `submit_count_r8192.sh` | recovery error against rollout length and count, drift, jellyfish plots and dimension sweeps; [`PMC_DIAGNOSTICS.md`](PMC_DIAGNOSTICS.md) records every run |
+| Other appendix experiments | `retrain_transient.slurm`, `transient_eval.slurm`, `submit_prior_shape.sh`, `prior_shape.slurm`, `predictive_fidelity.slurm` | dense-early retraining for the training-dynamics figures, the Gaussian-against-Laplace prior test, next-token fidelity |
+| Historical | `rebuttal/` | the rebuttal-period jobs, kept unchanged as a record; see its README |
+
+Every script explains itself in its header comment: why it exists, its
+settings, and what it costs.
 
 ## 0. One-time setup (login node)
 
@@ -116,6 +124,30 @@ CHECKPOINT_SOURCE=/path/to/scratch/bft-pmc \
 
 [`PMC_DIAGNOSTICS.md`](PMC_DIAGNOSTICS.md) records every run's settings, what it and each
 submission save, and how to reproduce the runs or redraw their figures.
+
+Three follow-up submitters extend the batch to the settings the appendix finally plots, each
+explained in its header: `submit_markov_n500.sh` (the Markov dimension and task-diversity runs
+at N=500, by rotary position interpolation), `submit_count_r8192.sh` (the three M=32 count
+curves with an 8192-rollout pool) and `submit_markov_dim_sweep.sh` (the Markov dimension group
+alone).
+
+## 6. Other appendix experiments
+
+```bash
+# Training dynamics with checkpoints dense early in training (the sweep's checkpoints start at
+# step 500, after the balls-and-urns transient): retrain the M=32 runs, then evaluate every
+# checkpoint. Array indices 0-2 are LR x {learned, rope, none}, 3-5 balls-and-urns.
+sbatch --array=0-5 slurm/retrain_transient.slurm
+sbatch --array=0-5 --dependency=afterok:<RETRAIN_JOBID> slurm/transient_eval.slurm
+
+# Gaussian against variance-matched Laplace prior: R=8192 prior rollouts per task diversity,
+# then the analysis of the saved rollouts (CPU, no checkpoint).
+bash slurm/submit_prior_shape.sh
+sbatch --dependency=afterok:<PRIOR_JOBIDS> slurm/prior_shape.slurm
+
+# Next-token fidelity of the balls-and-urns and Markov M=32 models, to position 500.
+sbatch slurm/predictive_fidelity.slurm
+```
 
 ## Disk
 

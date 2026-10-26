@@ -8,7 +8,7 @@ import pytest
 import torch
 from torch import nn
 
-from markov.analysis_common import (
+from bft_pmc.markov.analysis_common import (
     _load_checkpoint_payload,
     _load_config_from_checkpoint,
     _load_task_distribution,
@@ -16,7 +16,7 @@ from markov.analysis_common import (
     load_trained_markov_artifacts,
     task_distribution_files,
 )
-from markov.baselines import (
+from bft_pmc.markov.baselines import (
     bi_inf_posterior_alpha,
     bi_inf_predictive,
     bi_ret_posterior_weights,
@@ -26,22 +26,27 @@ from markov.baselines import (
     uni_inf_predictive,
     uni_ret_predictive,
 )
-from markov.config import MarkovConfig, apply_overrides, dump_config, load_config
-from markov.data import MarkovChainDataset
-from markov.evals import (
+from bft_pmc.markov.config import (
+    MarkovConfig,
+    apply_overrides,
+    dump_config,
+    load_config,
+)
+from bft_pmc.markov.data import MarkovChainDataset
+from bft_pmc.markov.evals import (
     _sample_ood_tokens_bos,
     estimate_transition_matrix,
     evaluate_baseline_deltas,
     evaluate_kl,
 )
-from markov.model import (
+from bft_pmc.markov.model import (
     CausalSelfAttention,
     DecoderBlock,
     MarkovTransformer,
     apply_rotary_embedding,
     precompute_rotary_frequencies,
 )
-from markov.predictive_monte_carlo import (
+from bft_pmc.markov.predictive_monte_carlo import (
     _estimate_transition_matrices_from_rollouts,
     _prepare_prompt_batch,
     predictive_monte_carlo_transition_matrix,

@@ -5,15 +5,14 @@ from pathlib import Path
 import pytest
 import torch
 
-from models.pos_encoding import positional_encoding_kwargs
+from bft_pmc.pos_encoding import positional_encoding_kwargs
 from pfn_transformerlens import checkpointing
-from pfn_transformerlens.model.PFN import PFNModel
 from pfn_transformerlens.model.configs import (
     BasePFNConfig,
     SupervisedRegressionPFNConfig,
     UnsupervisedPFNConfig,
 )
-
+from pfn_transformerlens.model.PFN import PFNModel
 
 ENCODINGS = ("learned", "rope", "none")
 
@@ -83,7 +82,9 @@ def test_a_sequence_model_keeps_its_outputs_and_runs_past_the_trained_context(
 ) -> None:
     path = _save(_sequence_config(pos_encoding), tmp_path / "model.pt")
     original, _, _ = checkpointing.load_checkpoint(path, device="cpu")
-    extended, _, _ = checkpointing.load_checkpoint(path, device="cpu", n_ctx_override=32)
+    extended, _, _ = checkpointing.load_checkpoint(
+        path, device="cpu", n_ctx_override=32
+    )
     assert extended.transformer.cfg.n_ctx == 32
 
     tokens = torch.randint(0, 5, (3, 8)).float()
@@ -100,7 +101,9 @@ def test_a_pair_model_keeps_its_outputs_and_runs_past_the_trained_context(
 ) -> None:
     path = _save(_pair_config(pos_encoding), tmp_path / "model.pt")
     original, _, _ = checkpointing.load_checkpoint(path, device="cpu")
-    extended, _, _ = checkpointing.load_checkpoint(path, device="cpu", n_ctx_override=32)
+    extended, _, _ = checkpointing.load_checkpoint(
+        path, device="cpu", n_ctx_override=32
+    )
 
     x, y = torch.randn(3, 4, 2), torch.randn(3, 4)
     with torch.no_grad():
@@ -110,8 +113,12 @@ def test_a_pair_model_keeps_its_outputs_and_runs_past_the_trained_context(
 
 def test_a_learned_sequence_table_repeats_its_last_position(tmp_path: Path) -> None:
     path = _save(_sequence_config("learned"), tmp_path / "model.pt")
-    trained = torch.load(path, weights_only=False)["model_state_dict"]["transformer.pos_embed.W_pos"]
-    extended, _, _ = checkpointing.load_checkpoint(path, device="cpu", n_ctx_override=12)
+    trained = torch.load(path, weights_only=False)["model_state_dict"][
+        "transformer.pos_embed.W_pos"
+    ]
+    extended, _, _ = checkpointing.load_checkpoint(
+        path, device="cpu", n_ctx_override=12
+    )
     table = extended.transformer.W_pos.detach()
     torch.testing.assert_close(table[:8], trained)
     torch.testing.assert_close(table[8:], trained[7].expand(4, -1))
@@ -120,8 +127,12 @@ def test_a_learned_sequence_table_repeats_its_last_position(tmp_path: Path) -> N
 def test_a_learned_pair_table_keeps_the_x_and_y_slots(tmp_path: Path) -> None:
     """Interleaved models reuse the last x-slot row for x tokens and the last y-slot row for y."""
     path = _save(_pair_config("learned"), tmp_path / "model.pt")
-    trained = torch.load(path, weights_only=False)["model_state_dict"]["transformer.pos_embed.W_pos"]
-    extended, _, _ = checkpointing.load_checkpoint(path, device="cpu", n_ctx_override=14)
+    trained = torch.load(path, weights_only=False)["model_state_dict"][
+        "transformer.pos_embed.W_pos"
+    ]
+    extended, _, _ = checkpointing.load_checkpoint(
+        path, device="cpu", n_ctx_override=14
+    )
     table = extended.transformer.W_pos.detach()
     torch.testing.assert_close(table[:8], trained)
     torch.testing.assert_close(table[8::2], trained[6].expand(3, -1))
@@ -131,10 +142,23 @@ def test_a_learned_pair_table_keeps_the_x_and_y_slots(tmp_path: Path) -> None:
 def test_extend_positional_table_follows_the_period() -> None:
     table = torch.arange(4.0).unsqueeze(-1)
     assert checkpointing.extend_positional_table(table, 7, 1).squeeze(-1).tolist() == [
-        0.0, 1.0, 2.0, 3.0, 3.0, 3.0, 3.0,
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        3.0,
+        3.0,
+        3.0,
     ]
     assert checkpointing.extend_positional_table(table, 8, 2).squeeze(-1).tolist() == [
-        0.0, 1.0, 2.0, 3.0, 2.0, 3.0, 2.0, 3.0,
+        0.0,
+        1.0,
+        2.0,
+        3.0,
+        2.0,
+        3.0,
+        2.0,
+        3.0,
     ]
 
 

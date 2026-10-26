@@ -10,15 +10,11 @@
 # the prior branch and writes sweep_combined.png, 32 takes the posterior branch
 # and writes sweep_combined{,_2x2}.png. Both land on the same filename, so they
 # need separate output directories or the second silently overwrites the first.
-#
-# `python -m` throughout: by-path invocation lets balls_and_urns/analysis.py
-# shadow the top-level analysis/ package.
 
 set -uo pipefail
 
 cd "$(dirname "$0")/.."
 source .venv/bin/activate
-export PYTHONPATH=.
 
 # The 2026-08 sweeps condition on 32 tokens; earlier runs used 8.
 PROMPT_LENGTH="${PROMPT_LENGTH:-32}"
@@ -44,11 +40,11 @@ for ENC in learned rope none; do
   BAU_SWEEP=$(ls -d outputs/bau/sweep_analysis_"${ENC}"/*/ 2>/dev/null | tail -1)
 
   if [[ -n "${LR_SWEEP}" ]]; then
-    run "lr/${ENC} sweep posterior" python -m linear_regression.plot_sweep_combined \
+    run "lr/${ENC} sweep posterior" python eval.py plot-lr-sweep \
       --metrics-csv "${LR_SWEEP}metrics.csv" \
       --output-dir "${LR_SWEEP}figures_sweep_posterior" \
       --prompt-length "${PROMPT_LENGTH}"
-    run "lr/${ENC} sweep prior" python -m linear_regression.plot_sweep_combined \
+    run "lr/${ENC} sweep prior" python eval.py plot-lr-sweep \
       --metrics-csv "${LR_SWEEP}metrics.csv" \
       --output-dir "${LR_SWEEP}figures_sweep_prior" \
       --prompt-length 0
@@ -59,9 +55,9 @@ for ENC in learned rope none; do
   if [[ -n "${LR_SWEEP}" ]]; then
     # Prior-space panels come from a different plotter than the sweep grids.
     # The Delta MSE panel needs a sidecar CSV from
-    # scripts/compute_lr_prior_delta_mse.py, which requires the checkpoints; the
+    # bft_pmc/linear_regression/prior_delta_mse.py, which requires the checkpoints; the
     # step is reported as FAIL rather than skipped when that CSV is absent.
-    run "lr/${ENC} prior panels" python -m linear_regression.plot_sweep_prior \
+    run "lr/${ENC} prior panels" python eval.py plot-lr-prior \
       --metrics-csv "${LR_SWEEP}metrics.csv" \
       --delta-csv "${LR_SWEEP}prior_delta_mse.csv" \
       --out-path "${LR_SWEEP}figures_sweep_prior/lr_sweep_prior_delta_ed_sw.png"
@@ -69,12 +65,12 @@ for ENC in learned rope none; do
 
   if [[ -n "${BAU_SWEEP}" ]]; then
     # BAU's plotter emits sweep_posterior{,_2x2} and sweep_prior in one call.
-    run "bau/${ENC} sweep" python -m balls_and_urns.plot_sweep_combined \
+    run "bau/${ENC} sweep" python eval.py plot-bau-sweep \
       --metrics-csv "${BAU_SWEEP}metrics.csv" \
       --output-dir "${BAU_SWEEP}figures_sweep"
     # --kl-csv defaults to a path the 2026-08 sweeps never wrote; point it at
     # the sidecar from scripts/rebuild_prior_sidecars.sh.
-    run "bau/${ENC} prior panels" python -m balls_and_urns.plot_sweep_prior \
+    run "bau/${ENC} prior panels" python eval.py plot-bau-prior \
       --metrics-csv "${BAU_SWEEP}metrics.csv" \
       --kl-csv "${BAU_SWEEP}prior_predictive_kl.csv" \
       --out-path "${BAU_SWEEP}figures_sweep/bau_sweep_prior_kl_ed_sw.png"
@@ -86,16 +82,16 @@ done
 # ---- Markov (no positional-encoding variants) ------------------------------
 MARKOV=outputs/markov/sweep_analysis
 if [[ -f "${MARKOV}/metrics.csv" ]]; then
-  run "markov sweep" python -m markov.plot_sweep_combined \
+  run "markov sweep" python eval.py plot-markov-sweep \
     --runs-dir "${MARKOV}/runs" \
     --metrics-csv "${MARKOV}/metrics.csv" \
     --out-path outputs/markov/figures_sweep/markov_sweep_combined.png
-  run "markov sweep prior" python -m markov.plot_sweep_prior \
+  run "markov sweep prior" python eval.py plot-markov-prior \
     --metrics-csv "${MARKOV}/metrics.csv" \
     --out-path outputs/markov/figures_sweep/markov_sweep_prior_kl_ed_sw.png
   # KL comes from outputs/markov/training/<run>/training_log.csv, which this
   # sweep did write -- the W&B export the plotters used before does not exist.
-  run "markov dynamics" python -m markov.plot_dynamics_combined \
+  run "markov dynamics" python eval.py plot-markov-dynamics \
     --runs-dir "${MARKOV}/runs" \
     --out-dir outputs/markov/figures_dynamics
 else

@@ -9,11 +9,11 @@ same models. Every run draws 1024 rollouts. This file records every setting, wha
 saves, and how to reproduce or redraw it.
 
 The BAU and Markov diagnostics are computed exactly as on the `pmc-diagnostics` branch: the
-camera-ready copies of `analysis/pmc_diagnostics.py` and the two family scripts only add
+camera-ready copies of `bft_pmc/analysis/pmc_diagnostics.py` and the two family scripts only add
 saving and a context check. Run on the same tiny models with the same arguments, the
 `pmc-diagnostics` code and this code wrote identical trajectories, recovery curves, drift
 curves, per-path drift and count curves (30 of 30 CSV/NPZ outputs). The branch had no LR
-version; `linear_regression/rollout_diagnostics.py` follows the other two and takes its
+version; `bft_pmc/linear_regression/rollout_diagnostics.py` follows the other two and takes its
 sampler, prompts, baselines and estimator from the camera-ready LR sweep.
 
 Rebuttal items covered (see `camera-ready-todo.md`): B2 (jellyfish plots), B3
@@ -39,7 +39,7 @@ Nothing is trained for them.
 ## Results not rerun
 
 The rebuttal runs on `pmc-diagnostics` are not repeated here. Their results stay in
-`diagnostics_results/`, byte-identical to that branch:
+`paper_data/rebuttal_diagnostics/`, byte-identical to that branch:
 
 | Directory | Model | Prompt | N |
 | --- | --- | --- | --- |
@@ -97,7 +97,7 @@ models). The context used: 1024 positions for BAU (BOS + 32 + 500 = 533), 1064 t
 (2 × (32 + 500)). What `rope` and `learned` models do at positions they never saw is part of
 what these runs measure; the in-context N = 223 runs of the same models are the reference.
 
-**Markov** has its own transformer (`markov/model.py`), so it takes `--seq-len-override`
+**Markov** has its own transformer (`bft_pmc/markov/model.py`), so it takes `--seq-len-override`
 instead. Its rotary tables are non-persistent buffers, absent from the checkpoint and rebuilt
 at construction, so a longer context changes no saved weight. `--rope-scaling` then picks what
 happens past the trained context:
@@ -180,18 +180,12 @@ is not copied.
 
 ## Launching
 
-```bash
-bash scripts/sync_to_m3.sh                          # on the Mac: send the code to /projects/qh36/bft-pmc
-```
+Get the code onto the cluster first: `git pull` in the cluster checkout for committed changes,
+or `bash scripts/m3/sync_code.sh` from the workstation for uncommitted ones (it sends added and
+modified files only; see [`scripts/README.md`](../scripts/README.md#cluster-sync-scripts)). Then
+run `uv sync` there once, so the `.venv` the jobs activate has the current package installed.
 
-`sync_to_m3.sh` sends only files uncommitted in the clone. `analysis/checkpoints.py` is
-committed on `camera-ready` but older on M3, so send it once as well:
-
-```bash
-rsync -avR analysis/checkpoints.py haotongm@m3.massive.org.au:/projects/qh36/bft-pmc/
-```
-
-On an M3 login node, from `/projects/qh36/bft-pmc`:
+On an M3 login node, from the repository checkout (`/projects/qh36/bft-pmc`):
 
 ```bash
 bash slurm/submit_pmc_diagnostics.sh --dry-run      # print the 88 sbatch commands, submit nothing
@@ -306,7 +300,7 @@ encoding and length:
 - **Recovery error vs rollout count.** At the final N, 50 random subsets of R rollouts per R
   give a mean and standard deviation of each metric. The Monte Carlo floor applies the same
   metrics to a fresh reference draw of size R, so it is what a perfect model would score.
-- **Jellyfish** (`analysis/path_stability.py`, Ng et al., TabMGP, Figures 3 and 8). The expected
+- **Jellyfish** (`bft_pmc/analysis/path_stability.py`, Ng et al., TabMGP, Figures 3 and 8). The expected
   scaled L1 norm E over F_N of (1/p)·‖θ(F_n) − θ(F_N)‖₁ against N − n, where z_{1:n} is one
   realisation of the observed data, θ(F_n) the estimator on that prompt, θ(F_N) the same
   estimator on the prompt plus the first N − n generated steps, and the expectation is the mean
@@ -365,12 +359,12 @@ python train.py bau --num-tasks 32 --pos-encoding none --vocab-size {6,24,48} --
 **1-Markov sweep** (`slurm/train_markov_dim.slurm`), the `markov_M32` command with `--k {3,4,6,8}`:
 
 ```bash
-python train.py markov --config-path markov/train.yaml --k {3,4,6,8} --n-chains 32 \
+python train.py markov --config-path configs/markov/train.yaml --k {3,4,6,8} --n-chains 32 \
   --run-name k{K} --checkpoint-root checkpoints/markov_dim_sweep --output-root outputs/markov_dim_sweep \
   --pmc-num-samples 100 --pmc-prompt-len 32 --pmc-generation-length 223 --no-use-wandb
 ```
 
-Everything else comes from `markov/train.yaml`, as for the camera-ready Markov models:
+Everything else comes from `configs/markov/train.yaml`, as for the camera-ready Markov models:
 seq_len 256, batch size 128, learning rate 6e-4, 100000 steps, and the default seed 42.
 
 ## What each run saves
@@ -390,7 +384,7 @@ Each diagnostics directory holds, for each prompt source (`prior`, `posterior`):
 
 and once per run:
 
-- `<run>_rollouts.npz`: the jellyfish rollouts in the format `analysis/path_stability.py`
+- `<run>_rollouts.npz`: the jellyfish rollouts in the format `bft_pmc/analysis/path_stability.py`
   reads — 20 realisations × 128 rollouts × (prompt + N) — with the prompt length, the task-pool
   size, the checkpoint step and the urn or task behind each realisation. These are drawn after
   every other diagnostic, so they leave the rollouts above untouched.
@@ -441,8 +435,8 @@ rerun on different hardware reproduces the distributions but not necessarily the
 ## Pulling and redrawing
 
 ```bash
-bash scripts/pull_pmc_diagnostics_from_m3.sh                      # on the Mac: outputs and submission records
-bash scripts/pull_pmc_diagnostics_from_m3.sh --with-checkpoints   # also every input file the run records name
+bash scripts/m3/pull_pmc_diagnostics.sh                      # on the Mac: outputs and submission records
+bash scripts/m3/pull_pmc_diagnostics.sh --with-checkpoints   # also every input file the run records name
 uv run eval.py replot-pmc-diagnostics --roots outputs/pmc_diagnostics
 ```
 

@@ -9,10 +9,10 @@ import pandas as pd
 import pytest
 import torch
 
-from markov.config import MarkovConfig
-from markov.data import MarkovChainDataset
-from markov.model import MarkovTransformer
-import markov.sweep_analysis as sweep
+import bft_pmc.markov.sweep_analysis as sweep
+from bft_pmc.markov.config import MarkovConfig
+from bft_pmc.markov.data import MarkovChainDataset
+from bft_pmc.markov.model import MarkovTransformer
 
 
 def _fake_pmc(
@@ -407,7 +407,10 @@ def test_analyze_run_prior_and_posterior_paths(
         sweep_samples_dir=tmp_path / "subsampled_samples",
     )
     assert subsampled_n_chains == 2
-    assert int(pd.read_csv(tmp_path / "subsampled_runs/run/metrics.csv")["step"].max()) == 2
+    assert (
+        int(pd.read_csv(tmp_path / "subsampled_runs/run/metrics.csv")["step"].max())
+        == 2
+    )
 
     plotted.clear()
     sweep._analyze_run(

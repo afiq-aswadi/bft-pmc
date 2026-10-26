@@ -8,9 +8,9 @@ import pandas as pd
 import pytest
 import torch
 
-from markov.config import MarkovConfig, dump_config
-import markov.task_diversity_threshold as threshold
-import markov.train as markov_train
+import bft_pmc.markov.task_diversity_threshold as threshold
+import bft_pmc.markov.train as markov_train
+from bft_pmc.markov.config import MarkovConfig, dump_config
 
 
 class FakeWandbRun:

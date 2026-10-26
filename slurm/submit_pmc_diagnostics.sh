@@ -1,8 +1,8 @@
 #!/bin/bash
 # Submit the PMC rollout diagnostics for the camera-ready: recovery error vs
 # rollout length, recovery error vs rollout count and drift vs length, computed
-# as on the pmc-diagnostics branch (analysis/pmc_diagnostics.py), plus the
-# jellyfish plot of Ng et al. (analysis/path_stability.py) from the same
+# as on the pmc-diagnostics branch (bft_pmc/analysis/pmc_diagnostics.py), plus the
+# jellyfish plot of Ng et al. (bft_pmc/analysis/path_stability.py) from the same
 # rollouts. Every run draws 1024 rollouts.
 #
 # Every model has the camera-ready configuration of slurm/train.slurm: either a
@@ -18,7 +18,7 @@
 # Nothing here repeats the pmc-diagnostics branch. Its rebuttal runs used
 # models outside the camera-ready configuration (the seq-1024 Markov model, and
 # NoPE balls-and-urns models trained with another checkpoint schedule), and
-# their results stay in diagnostics_results/.
+# their results stay in paper_data/rebuttal_diagnostics/.
 #
 #   lr-m32      The camera-ready linear-regression M=32 checkpoints, one per
 #               positional encoding (learned, rope, none), each at N=223 and N=500.
@@ -391,7 +391,7 @@ save_submission_record() {
   # Source files only, as they are on disk now (tracked files deleted from the
   # working tree are skipped); data, checkpoints and outputs stay out.
   grep -E '\.(py|sh|slurm|yaml|yml|toml|md|lock|txt|cfg|ini)$' "${listing}" \
-    | grep -v -E '^(\.venv|\.git|\.claude|outputs|checkpoints|logs|paper_data|figures|corrected_figures|diagnostics_results)/' \
+    | grep -v -E '^(\.venv|\.git|\.claude|outputs|checkpoints|logs|paper_data|figures|corrected_figures)/' \
     | while IFS= read -r path; do
         if [[ -f "${path}" ]]; then echo "${path}"; fi
       done > "${SUBMISSION_DIR}/source_files.txt"

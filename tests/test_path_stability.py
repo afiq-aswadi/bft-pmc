@@ -7,8 +7,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-import analysis.path_stability as ps
-from analysis.rollouts import rollout_bundle_path, save_rollout_bundle
+import bft_pmc.analysis.path_stability as ps
+from bft_pmc.analysis.rollouts import rollout_bundle_path, save_rollout_bundle
 
 
 def _write_lr_bundle(

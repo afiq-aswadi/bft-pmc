@@ -4,7 +4,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from models.pos_encoding import (
+from bft_pmc.pos_encoding import (
     POSITIONAL_ENCODINGS,
     positional_encoding_kwargs,
     positional_encoding_of,

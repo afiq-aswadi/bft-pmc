@@ -4,7 +4,7 @@ from pathlib import Path
 
 import numpy as np
 
-from analysis.rollouts import (
+from bft_pmc.analysis.rollouts import (
     compact_token_array,
     is_rollout_bundle,
     load_rollout_bundle,

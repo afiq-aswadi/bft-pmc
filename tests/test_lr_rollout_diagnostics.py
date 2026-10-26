@@ -9,11 +9,11 @@ import pandas as pd
 import pytest
 import torch
 
-from analysis.path_stability import analyse_bundle
-from analysis.pmc_diagnostics import FIGURE_INDEX, RUN_RECORD, file_sha256
-from analysis.replot_pmc_diagnostics import replot_directory
-from linear_regression import train as lr_train
-from linear_regression.rollout_diagnostics import (
+from bft_pmc.analysis.path_stability import analyse_bundle
+from bft_pmc.analysis.pmc_diagnostics import FIGURE_INDEX, RUN_RECORD, file_sha256
+from bft_pmc.analysis.replot_pmc_diagnostics import replot_directory
+from bft_pmc.linear_regression import train as lr_train
+from bft_pmc.linear_regression.rollout_diagnostics import (
     LinearRegressionDiagnosticsConfig,
     main,
     running_least_squares,
@@ -47,7 +47,9 @@ def lr_checkpoint(tmp_path_factory: pytest.TempPathFactory) -> Path:
     return root / "checkpoint_step_2.pt"
 
 
-def _config(checkpoint: Path, output_dir: Path, **overrides: Any) -> LinearRegressionDiagnosticsConfig:
+def _config(
+    checkpoint: Path, output_dir: Path, **overrides: Any
+) -> LinearRegressionDiagnosticsConfig:
     settings: dict[str, Any] = {
         "checkpoint_path": str(checkpoint),
         "output_dir": str(output_dir),
@@ -88,7 +90,10 @@ def test_diagnostics_save_everything_needed_to_redraw_them(
     with np.load(output_dir / "posterior_trajectories.npz") as archive:
         assert archive["rollout_x"].shape == (16, 8 + 24, 3)
         assert archive["rollout_y"].shape == (16, 8 + 24)
-        np.testing.assert_array_equal(archive["rollout_x"][:, :8], np.broadcast_to(archive["prompt_x"], (16, 8, 3)))
+        np.testing.assert_array_equal(
+            archive["rollout_x"][:, :8],
+            np.broadcast_to(archive["prompt_x"], (16, 8, 3)),
+        )
         assert 0 <= int(archive["task_index"]) < 4
     with np.load(output_dir / "prior_trajectories.npz") as archive:
         assert archive["prompt_x"].shape == (0, 3)
@@ -122,7 +127,9 @@ def test_diagnostics_save_everything_needed_to_redraw_them(
         assert archive["rollout_x"].shape == (3, 5, 8 + 24, 3)
         assert archive["rollout_y"].shape == (3, 5, 8 + 24)
         assert archive["task_index"].shape == (3,)
-    curves = analyse_bundle(output_dir / "lr_m32_learned_rollouts.npz", setup="lr-learned/run")
+    curves = analyse_bundle(
+        output_dir / "lr_m32_learned_rollouts.npz", setup="lr-learned/run"
+    )
     assert curves.family == "lr"
     assert list(curves.grid) == list(range(8, 8 + 24 + 1))
     assert curves.expected[0] == 0.0
@@ -178,8 +185,12 @@ def test_least_squares_recovers_noiseless_weights() -> None:
     weights = torch.tensor([0.5, -1.0, 2.0])
     xs = torch.randn(2, 12, 3, generator=generator)
     ys = xs @ weights
-    estimates = running_least_squares(xs.numpy(), ys.numpy(), prompt_length=4, grid=[4, 8])
-    np.testing.assert_allclose(estimates, np.broadcast_to(weights.numpy(), (2, 2, 3)), atol=1e-5)
+    estimates = running_least_squares(
+        xs.numpy(), ys.numpy(), prompt_length=4, grid=[4, 8]
+    )
+    np.testing.assert_allclose(
+        estimates, np.broadcast_to(weights.numpy(), (2, 2, 3)), atol=1e-5
+    )
 
 
 @pytest.mark.parametrize(
@@ -199,3 +210,28 @@ def test_config_validation_rejects_inconsistent_settings(
 ) -> None:
     with pytest.raises(ValueError, match=message):
         _config(tmp_path / "unused.pt", tmp_path, **overrides).validate()
+
+
+def test_independent_count_pools_give_every_count_its_own_rollouts(
+    lr_checkpoint: Path, tmp_path: Path, saved_figures: list[Path]
+) -> None:
+    """With independent pools even R = num_rollouts gets n_resamples draws."""
+    output_dir = tmp_path / "pools"
+    main(
+        _config(
+            lr_checkpoint,
+            output_dir,
+            prompt_sources=["posterior"],
+            count_grid=[4, 16],
+            independent_count_pools=True,
+        )
+    )
+    resamples = pd.read_csv(output_dir / "posterior_recovery_vs_count_resamples.csv")
+    model = resamples[resamples["kind"] == "model"]
+    draws = model.groupby("num_rollouts")["resample"].nunique().to_dict()
+    assert draws == {r: 3 for r in [4, 16]}
+    counts = pd.read_csv(output_dir / "posterior_recovery_vs_count.csv")
+    endpoint = counts.set_index("num_rollouts").loc[[4, 16][-1]]
+    assert endpoint["dist/sw_vs_baseline_generalising/sd"] > 0
+    record = json.loads((output_dir / RUN_RECORD).read_text())
+    assert record["config"]["independent_count_pools"] is True

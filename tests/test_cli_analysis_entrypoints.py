@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from dataclasses import replace
-from pathlib import Path
 import re
 import runpy
 import subprocess
 import sys
+from dataclasses import replace
+from pathlib import Path
 from types import SimpleNamespace
 
 import pandas as pd
@@ -13,12 +13,11 @@ import pytest
 import tyro
 import yaml
 
-import balls_and_urns.sweep_analysis as bau_sweep
-import linear_regression.sweep_analysis as lr_sweep
-import markov.run_pmc as run_pmc
-import markov.sweep_analysis as markov_sweep
-import sweeps.run_yaml_sweep as yaml_sweep
-
+import bft_pmc.balls_and_urns.sweep_analysis as bau_sweep
+import bft_pmc.linear_regression.sweep_analysis as lr_sweep
+import bft_pmc.markov.run_pmc as run_pmc
+import bft_pmc.markov.sweep_analysis as markov_sweep
+import bft_pmc.sweep_runner as yaml_sweep
 
 ROOT = Path(__file__).resolve().parents[1]
 PAPER_SWEEP_CONFIGS = {
@@ -243,7 +242,7 @@ def test_yaml_sweep_accepts_documented_positional_path(tmp_path: Path) -> None:
         },
     )
     result = subprocess.run(
-        [sys.executable, "sweeps/run_yaml_sweep.py", str(path), "--dry-run"],
+        [sys.executable, "bft_pmc/sweep_runner.py", str(path), "--dry-run"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -254,7 +253,7 @@ def test_yaml_sweep_accepts_documented_positional_path(tmp_path: Path) -> None:
 
 
 def test_only_paper_sweep_configs_are_published() -> None:
-    config_names = {path.name for path in (ROOT / "sweeps/configs").glob("*.yaml")}
+    config_names = {path.name for path in (ROOT / "configs/sweeps").glob("*.yaml")}
     assert config_names == PAPER_SWEEP_CONFIGS
 
 
@@ -275,7 +274,7 @@ def test_paper_sweep_configs_use_published_task_diversity_grids() -> None:
     }
 
     for config_name, (parameter_name, expected_values) in expected_grids.items():
-        config_path = ROOT / "sweeps/configs" / config_name
+        config_path = ROOT / "configs/sweeps" / config_name
         config = yaml.safe_load(config_path.read_text())
         parameters = config["parameters"]
         actual_values = {
@@ -289,7 +288,7 @@ def test_paper_sweep_configs_use_published_task_diversity_grids() -> None:
 
 @pytest.mark.parametrize(
     "config_path",
-    sorted((ROOT / "sweeps/configs").glob("*.yaml")),
+    sorted((ROOT / "configs/sweeps").glob("*.yaml")),
 )
 def test_checked_in_sweeps_have_non_overwriting_valid_jobs(
     config_path: Path,
@@ -338,12 +337,12 @@ def test_checked_in_sweeps_have_non_overwriting_valid_jobs(
 @pytest.mark.parametrize(
     ("path", "expected_option"),
     [
-        ("scripts/generate_bau_eval_dataset.py", "--output-dir"),
-        ("scripts/compute_bau_prior_predictive_kl.py", "--checkpoint-root"),
-        ("scripts/compute_lr_prior_delta_mse.py", "--checkpoint-root"),
-        ("scripts/compute_markov_prior_predictive_kl.py", "--manifest-csv"),
-        ("balls_and_urns/train.py", "--num-tasks"),
-        ("balls_and_urns/beta_bernoulli.py", "--prior-alpha"),
+        ("bft_pmc/balls_and_urns/generate_eval_dataset.py", "--output-dir"),
+        ("bft_pmc/balls_and_urns/prior_predictive_kl.py", "--checkpoint-root"),
+        ("bft_pmc/linear_regression/prior_delta_mse.py", "--checkpoint-root"),
+        ("bft_pmc/markov/prior_predictive_kl.py", "--manifest-csv"),
+        ("bft_pmc/balls_and_urns/train.py", "--num-tasks"),
+        ("bft_pmc/balls_and_urns/beta_bernoulli.py", "--prior-alpha"),
     ],
 )
 def test_direct_script_cli_imports_project(path: str, expected_option: str) -> None:
@@ -361,10 +360,10 @@ def test_direct_script_cli_imports_project(path: str, expected_option: str) -> N
 @pytest.mark.parametrize(
     "path",
     [
-        "linear_regression/sweep_analysis.py",
-        "markov/run_pmc.py",
-        "sweeps/run_yaml_sweep.py",
-        "balls_and_urns/beta_bernoulli.py",
+        "bft_pmc/linear_regression/sweep_analysis.py",
+        "bft_pmc/markov/run_pmc.py",
+        "bft_pmc/sweep_runner.py",
+        "bft_pmc/balls_and_urns/beta_bernoulli.py",
     ],
 )
 def test_cli_guards_do_not_bypass_tyro(
@@ -372,9 +371,9 @@ def test_cli_guards_do_not_bypass_tyro(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     if path in {
-        "linear_regression/sweep_analysis.py",
-        "markov/run_pmc.py",
-        "balls_and_urns/beta_bernoulli.py",
+        "bft_pmc/linear_regression/sweep_analysis.py",
+        "bft_pmc/markov/run_pmc.py",
+        "bft_pmc/balls_and_urns/beta_bernoulli.py",
     }:
 
         def stop_after_cli(target: object) -> None:
