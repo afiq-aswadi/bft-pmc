@@ -1,5 +1,9 @@
 # BFT-PMC: Predictive Monte Carlo for Bayes-filtered transformers
 
+[![Interactive supplement](https://img.shields.io/badge/Interactive_supplement-Open-1f6feb?style=for-the-badge)](https://afiq-aswadi.github.io/bft-pmc/)
+[![Paper](https://img.shields.io/badge/Paper-OpenReview-8c1b13?style=for-the-badge)](https://openreview.net/forum?id=qZ5gMk6Gpd)
+[![Supplement PDF](https://img.shields.io/badge/Supplement-PDF-555555?style=for-the-badge)](icl2_supplementary.pdf)
+
 Code for *What does a Bayes-filtered transformer believe? A predictive Monte
 Carlo approach* (Aswadi, Ma and Wei, NeurIPS 2026). This is the camera-ready
 release; [Camera-ready release](#camera-ready-release) lists what changed since
