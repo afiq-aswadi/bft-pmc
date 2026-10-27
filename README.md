@@ -1,6 +1,6 @@
 # BFT-PMC: Predictive Monte Carlo for Bayes-filtered transformers
 
-[![Interactive supplement](https://img.shields.io/badge/Interactive_supplement-Open-1f6feb?style=for-the-badge)](https://afiq-aswadi.github.io/bft-pmc/)
+[![Interactive supplement](https://img.shields.io/badge/Interactive_supplement-Open-1f6feb?style=for-the-badge)](https://bft-pmc.github.io/)
 [![Paper](https://img.shields.io/badge/Paper-OpenReview-8c1b13?style=for-the-badge)](https://openreview.net/forum?id=qZ5gMk6Gpd)
 [![Supplement PDF](https://img.shields.io/badge/Supplement-PDF-555555?style=for-the-badge)](icl2_supplementary.pdf)
 
@@ -264,13 +264,13 @@ for the learned and rotary positional-encoding models. The second part gives
 every PMC-recovered marginal density and CDF for all three task families at
 every task diversity; the paper shows a representative subset.
 
-The [interactive supplement](https://afiq-aswadi.github.io/bft-pmc/) draws the
+The [interactive supplement](https://bft-pmc.github.io/) draws the
 recovered distributions in the browser from PMC samples: pick a task family, a
 task diversity and a prior or posterior, and every coordinate of the latent
 task appears as a density and a CDF against the two references, with a slider
 over rollout length. It also plots the sweep curves and collects the marginal
 figures. Its source is the
-[`gh-pages`](https://github.com/afiq-aswadi/bft-pmc/tree/gh-pages) branch.
+[`bft-pmc/bft-pmc.github.io`](https://github.com/bft-pmc/bft-pmc.github.io) website repository.
 
 ## Citation
 
