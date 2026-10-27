@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
-from pathlib import Path
 import subprocess
 import sys
+from dataclasses import dataclass
+from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
 
 import pytest
 import torch
 
+import pfn_transformerlens.wandb_utils as wandb_utils
 from pfn_transformerlens import checkpointing
 from pfn_transformerlens.checkpointing import CheckpointMetadata
-from pfn_transformerlens.model.PFN import PFNModel
 from pfn_transformerlens.model.bucketizer import Bucketizer, estimate_riemann_borders
 from pfn_transformerlens.model.configs import (
     ClassificationPFNConfig,
@@ -20,6 +20,7 @@ from pfn_transformerlens.model.configs import (
     UnsupervisedPFNConfig,
 )
 from pfn_transformerlens.model.configs.base import validate_bucket_config
+from pfn_transformerlens.model.PFN import PFNModel
 from pfn_transformerlens.sampler.data_generator import (
     DeterministicFunctionGenerator,
     SupervisedProbabilisticGenerator,
@@ -37,7 +38,6 @@ from pfn_transformerlens.sampler.prior_likelihood import (
 )
 from pfn_transformerlens.sampler.sampler import Sampler
 from pfn_transformerlens.wandb_logger import WandbLogger
-import pfn_transformerlens.wandb_utils as wandb_utils
 
 
 def _point_config() -> SupervisedRegressionPFNConfig:

@@ -1,0 +1,5 @@
+checkpoint,path,sym_kl_in_distribution,sym_kl_population
+vocab6,/private/tmp/claude-2010011751/-Users-<user>-Documents-research-ICL2/31093db8-054a-4a38-bc2b-fb359a1e76af/scratchpad/nope_ckpts/vocab6.pt,0.0005006948267691769,0.10357084684073925
+vocab12,/private/tmp/claude-2010011751/-Users-<user>-Documents-research-ICL2/31093db8-054a-4a38-bc2b-fb359a1e76af/scratchpad/nope_ckpts/vocab12.pt,0.0006202893564477563,0.22331305220723152
+vocab24,/private/tmp/claude-2010011751/-Users-<user>-Documents-research-ICL2/31093db8-054a-4a38-bc2b-fb359a1e76af/scratchpad/nope_ckpts/vocab24.pt,0.0009234161989297718,0.3595980927348137
+vocab48,/private/tmp/claude-2010011751/-Users-<user>-Documents-research-ICL2/31093db8-054a-4a38-bc2b-fb359a1e76af/scratchpad/nope_ckpts/vocab48.pt,0.0015134066343307495,0.39950623363256454

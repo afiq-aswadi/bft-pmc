@@ -1,8 +1,8 @@
 from __future__ import annotations
 
+import runpy
 from dataclasses import replace
 from pathlib import Path
-import runpy
 from types import SimpleNamespace
 from typing import NoReturn
 
@@ -10,19 +10,19 @@ import numpy as np
 import pandas as pd
 import pytest
 import torch
-from torch import nn
 import tyro
+from torch import nn
 
-from balls_and_urns.dataset import (
+import bft_pmc.balls_and_urns.generate_eval_dataset as bau_dataset
+import bft_pmc.balls_and_urns.prior_predictive_kl as bau_prior
+import bft_pmc.linear_regression.prior_delta_mse as lr_prior
+import bft_pmc.markov.prior_predictive_kl as markov_prior
+from bft_pmc.balls_and_urns.dataset import (
     load_generalising_dataset,
     load_memorising_dataset,
 )
-from linear_regression.priors import DiscretePrior
+from bft_pmc.linear_regression.priors import DiscretePrior
 from pfn_transformerlens.model.PFN import DistributionPrediction
-import scripts.compute_bau_prior_predictive_kl as bau_prior
-import scripts.compute_lr_prior_delta_mse as lr_prior
-import scripts.compute_markov_prior_predictive_kl as markov_prior
-import scripts.generate_bau_eval_dataset as bau_dataset
 
 
 class LRPredictionModel(nn.Module):
@@ -471,10 +471,10 @@ def _stop(*args: object, **kwargs: object) -> NoReturn:
 @pytest.mark.parametrize(
     "path",
     [
-        "scripts/compute_lr_prior_delta_mse.py",
-        "scripts/compute_bau_prior_predictive_kl.py",
-        "scripts/compute_markov_prior_predictive_kl.py",
-        "scripts/generate_bau_eval_dataset.py",
+        "bft_pmc/linear_regression/prior_delta_mse.py",
+        "bft_pmc/balls_and_urns/prior_predictive_kl.py",
+        "bft_pmc/markov/prior_predictive_kl.py",
+        "bft_pmc/balls_and_urns/generate_eval_dataset.py",
     ],
 )
 def test_public_data_script_guards(

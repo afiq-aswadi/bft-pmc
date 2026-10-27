@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from pathlib import Path
+import math
 import sys
+from dataclasses import replace
+from pathlib import Path
 
 import matplotlib
 
@@ -12,17 +14,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from balls_and_urns import plot_dynamics_combined as bau_dynamics
-from balls_and_urns import plot_sweep_combined as bau_sweep
-from balls_and_urns import plot_sweep_prior as bau_prior
-from linear_regression import plot_dynamics_combined as lr_dynamics
-from linear_regression import plot_stitched_sweep_dynamics as lr_stitched
-from linear_regression import plot_sweep_combined as lr_sweep
-from linear_regression import plot_sweep_prior as lr_prior
-from markov import plot_dynamics_combined as markov_dynamics
-from markov import plot_sweep_combined as markov_sweep
-from markov import plot_sweep_prior as markov_prior
-
+from bft_pmc.balls_and_urns import plot_dynamics_combined as bau_dynamics
+from bft_pmc.balls_and_urns import plot_sweep_combined as bau_sweep
+from bft_pmc.balls_and_urns import plot_sweep_prior as bau_prior
+from bft_pmc.linear_regression import plot_dynamics_combined as lr_dynamics
+from bft_pmc.linear_regression import plot_stitched_sweep_dynamics as lr_stitched
+from bft_pmc.linear_regression import plot_sweep_combined as lr_sweep
+from bft_pmc.linear_regression import plot_sweep_prior as lr_prior
+from bft_pmc.markov import plot_dynamics_combined as markov_dynamics
+from bft_pmc.markov import plot_sweep_combined as markov_sweep
+from bft_pmc.markov import plot_sweep_prior as markov_prior
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PAPER_DATA = REPO_ROOT / "paper_data"
@@ -312,13 +313,87 @@ def test_markov_aggregate_figure_entry_points(
         ],
     )
     markov_prior.main()
-    assert len(saved_figures) == 8
+    # Sweep and each dynamics run: the full figure plus the KL/ED and KL/SW twins.
+    assert [path.name for path in saved_figures] == [
+        "markov_sweep.png",
+        "markov_sweep_2x2.png",
+        "markov_sweep_2x2_sw.png",
+        "dynamics_M32.png",
+        "dynamics_M32_2x2.png",
+        "dynamics_M32_2x2_sw.png",
+        "dynamics_M8.png",
+        "dynamics_M8_2x2.png",
+        "dynamics_M8_2x2_sw.png",
+        "markov_prior.png",
+        "markov_prior.png",
+    ]
+
+
+def test_markov_paper_twins_pair_kl_with_one_posterior_metric(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    saved_figures: list[Path],
+) -> None:
+    """Each saved figure's columns, read off the y-labels drawn for it."""
+
+    def columns_per_figure(module, run) -> list[list[str]]:
+        labels: list[str] = []
+        monkeypatch.setattr(
+            module, "_style_ax", lambda ax, ylabel=None: labels.append(ylabel)
+        )
+        run()
+        # Every column is styled once per row, and there are two rows.
+        per_figure, start = [], 0
+        for n_cols in (3, 2, 2):
+            per_figure.append(labels[start : start + 2 * n_cols : 2])
+            start += 2 * n_cols
+        assert start == len(labels)
+        return per_figure
+
+    expected = [
+        ["Symmetrised KL", "Energy distance", "Sliced Wasserstein"],
+        ["Symmetrised KL", "Energy distance"],
+        ["Symmetrised KL", "Sliced Wasserstein"],
+    ]
+    sweep_root = PAPER_DATA / "markov/sweep"
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_sweep_combined.py",
+            "--runs-dir",
+            str(sweep_root / "runs"),
+            "--metrics-csv",
+            str(sweep_root / "metrics.csv"),
+            "--out-path",
+            str(tmp_path / "markov_sweep.png"),
+        ],
+    )
+    assert columns_per_figure(markov_sweep, markov_sweep.main) == expected
+
+    run_dir = next((PAPER_DATA / "markov/dynamics_m8/runs").iterdir())
+    assert (
+        columns_per_figure(
+            markov_dynamics,
+            lambda: markov_dynamics._process_run(run_dir, tmp_path, n_chains=8),
+        )
+        == expected
+    )
+    assert [path.name for path in saved_figures] == [
+        "markov_sweep.png",
+        "markov_sweep_2x2.png",
+        "markov_sweep_2x2_sw.png",
+        "dynamics_M8.png",
+        "dynamics_M8_2x2.png",
+        "dynamics_M8_2x2_sw.png",
+    ]
 
 
 def test_markov_aggregate_plot_edge_paths(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     saved_figures: list[Path],
+    capsys: pytest.CaptureFixture[str],
 ) -> None:
     metrics = pd.DataFrame(
         {
@@ -367,11 +442,48 @@ def test_markov_aggregate_plot_edge_paths(
     with pytest.raises(ValueError, match="cannot parse n_chains"):
         markov_sweep._build_rows(malformed_root, metrics_csv)
 
+    # A run with no KL history is a supported state, not an error: the 2026-08
+    # sweeps never wrote wandb_kl_history.csv, so KL reads as NaN and the
+    # figure drops that column rather than failing.
     missing_root = tmp_path / "missing_history"
     missing_root.mkdir()
     (missing_root / "run_chains2").mkdir()
-    with pytest.raises(FileNotFoundError):
-        markov_sweep._build_rows(missing_root, metrics_csv)
+    rows = markov_sweep._build_rows(missing_root, metrics_csv)
+    assert math.isnan(rows["in_distribution"][0].kl_vs_memorising)
+    assert not math.isnan(rows["in_distribution"][0].ed_vs_memorising)
+
+    panels = markov_sweep.available_panels(rows)
+    assert [label for label, _, _ in panels] == [
+        "Energy distance",
+        "Sliced Wasserstein",
+    ]
+
+    # end to end: the figure is produced with the KL column dropped, and says so
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_sweep_combined.py",
+            "--runs-dir",
+            str(missing_root),
+            "--metrics-csv",
+            str(metrics_csv),
+            "--out-path",
+            str(tmp_path / "no_kl" / "markov_sweep.png"),
+        ],
+    )
+    markov_sweep.main()
+    assert "no data for Symmetrised KL" in capsys.readouterr().err
+    # two metrics left, so only the full layout is emitted -- no narrower twin
+    no_kl = [path for path in saved_figures if path.parent.name == "no_kl"]
+    assert [path.name for path in no_kl] == ["markov_sweep.png"]
+    # with KL present, all three panels are offered
+    with_kl = {
+        "in_distribution": [
+            replace(rows["in_distribution"][0], kl_vs_memorising=0.5),
+        ],
+    }
+    assert len(markov_sweep.available_panels(with_kl)) == 3
 
     run_dir = tmp_path / "run_chains2"
     run_dir.mkdir()
@@ -398,7 +510,8 @@ def test_markov_aggregate_plot_edge_paths(
         }
     ).to_csv(run_dir / "wandb_kl_history.csv", index=False)
     markov_dynamics._process_run(run_dir, tmp_path, n_chains=2)
-    assert len(saved_figures) == 2
+    # three dynamics grids here, plus the one KL-less sweep figure drawn above
+    assert len(saved_figures) == 4
 
     monkeypatch.setattr(
         sys,
@@ -418,9 +531,11 @@ def test_markov_aggregate_plot_edge_paths(
 def test_intro_identifiability_figure_generator(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    import scripts.plot_intro_identifiability as intro
+    import bft_pmc.linear_regression.plot_intro_identifiability as intro
 
     out_path = tmp_path / "intro_identifiability_spike_slab.png"
-    monkeypatch.setattr(sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(out_path)])
+    monkeypatch.setattr(
+        sys, "argv", ["plot_intro_identifiability.py", "--out-path", str(out_path)]
+    )
     intro.main()
     assert out_path.is_file()

@@ -8,6 +8,22 @@ import numpy as np
 
 from pfn_transformerlens.model.PFN import BasePFN, PFNModel
 from pfn_transformerlens.model.configs.base import BasePFNConfig
+from pfn_transformerlens.model.configs.unsupervised import UnsupervisedPFNConfig
+
+
+def extend_positional_table(
+    table: torch.Tensor, n_ctx: int, period: int
+) -> torch.Tensor:
+    """Grow a learned positional table to ``n_ctx`` rows.
+
+    Every trained row is kept. Each position past the trained context reuses
+    the last trained position with the same index modulo ``period``, so with
+    ``period=2`` an x token still gets an x-slot embedding and a y token a
+    y-slot one.
+    """
+    trained = table.shape[0]
+    offsets = torch.arange(n_ctx - trained, device=table.device) % period
+    return torch.cat([table, table[trained - period + offsets]], dim=0)
 
 
 @dataclass
@@ -180,6 +196,7 @@ def load_checkpoint(
     checkpoint_path: Path | str,
     device: str = "auto",
     load_optimizer: bool = False,
+    n_ctx_override: int | None = None,
 ) -> tuple[BasePFN, dict | None, CheckpointMetadata]:
     """
     Load checkpoint from disk.
@@ -218,8 +235,53 @@ def load_checkpoint(
     config = ckpt["model_config"]
     device_str = _get_device(device)
     config.device = device_str
+    state_dict = ckpt["model_state_dict"]
+    strict = True
+    dropped_pos_keys: list[str] = []
+    if n_ctx_override is not None and n_ctx_override != config.n_ctx:
+        # Run past the training context, so rollouts can exceed it. Masks and
+        # rotary tables are deterministic in n_ctx and rebuilt at construction.
+        # A model without positional embeddings reads no position, so its
+        # forward pass on the first n_ctx positions is unchanged. A learned
+        # positional table has no rows past the trained context: it is grown by
+        # repeating the last trained position of each token slot (one slot for
+        # a plain sequence, two for interleaved x/y tokens), which keeps every
+        # trained row and the x/y alternation.
+        if n_ctx_override < config.n_ctx:
+            raise ValueError(
+                f"n_ctx_override ({n_ctx_override}) must exceed the trained "
+                f"context ({config.n_ctx})."
+            )
+        state_dict = dict(state_dict)
+        context_sized_suffixes = (
+            ".attn.mask",
+            ".attn.masked_bias",
+            ".attn.rotary_sin",
+            ".attn.rotary_cos",
+        )
+        period = 1 if isinstance(config, UnsupervisedPFNConfig) else 2
+        for key in list(state_dict):
+            if key.endswith("pos_embed.W_pos"):
+                state_dict[key] = extend_positional_table(
+                    state_dict[key], n_ctx_override, period
+                )
+            elif key.endswith(context_sized_suffixes):
+                del state_dict[key]
+                dropped_pos_keys.append(key)
+        config.n_ctx = n_ctx_override
+        strict = False
     model = PFNModel(config).to(device_str)
-    model.load_state_dict(ckpt["model_state_dict"])
+    load_result = model.load_state_dict(state_dict, strict=strict)
+    if not strict:
+        unexpected = list(load_result.unexpected_keys)
+        stray_missing = [
+            key for key in load_result.missing_keys if key not in dropped_pos_keys
+        ]
+        if unexpected or stray_missing:
+            raise RuntimeError(
+                f"Checkpoint mismatch beyond positional embeddings: "
+                f"missing={stray_missing}, unexpected={unexpected}"
+            )
     model.eval()
     # attach task distribution if present for downstream use
     if "task_distribution" in ckpt:

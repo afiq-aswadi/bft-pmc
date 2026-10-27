@@ -1,14 +1,12 @@
 from __future__ import annotations
 
 from dataclasses import replace
-import importlib
-import sys
 
 import pytest
 import torch
 
-import balls_and_urns.train as bau_train
-import linear_regression.train as lr_train
+import bft_pmc.balls_and_urns.train as bau_train
+import bft_pmc.linear_regression.train as lr_train
 
 
 def _lr_config() -> lr_train.TrainConfig:
@@ -56,6 +54,7 @@ def _bau_config() -> bau_train.TrainConfig:
         replace(_lr_config(), d_model=0),
         replace(_lr_config(), d_model=5),
         replace(_lr_config(), learning_rate=0),
+        replace(_lr_config(), seq_len=8),
         replace(_lr_config(), bucket_type="bad"),
         replace(_lr_config(), y_min=1, y_max=1),
     ],
@@ -124,6 +123,7 @@ def test_lr_border_estimation_and_training_modes(
     [
         replace(_bau_config(), d_model=0),
         replace(_bau_config(), d_model=5),
+        replace(_bau_config(), seq_len=16),
         replace(_bau_config(), alpha_value=0),
     ],
 )
@@ -149,43 +149,3 @@ def test_bau_training_dispatch_seeded_and_unseeded(
     assert len(calls) == 2
     assert calls[0][1].d_vocab == 3
     assert calls[0][1].d_vocab_out == 2
-
-
-def test_root_train_and_eval_dispatchers(
-    monkeypatch: pytest.MonkeyPatch,
-    capsys: pytest.CaptureFixture[str],
-) -> None:
-    root_train = importlib.import_module("train")
-    root_eval = importlib.import_module("eval")
-    root_train.main([])
-    root_eval.main(["--help"])
-    assert "Usage:" in capsys.readouterr().out
-
-    with pytest.raises(SystemExit, match="Unknown training"):
-        root_train.main(["bad"])
-    with pytest.raises(SystemExit, match="Unknown eval"):
-        root_eval.main(["bad"])
-
-    paths: list[tuple[str, str, list[str]]] = []
-    monkeypatch.setattr(
-        root_train.runpy,
-        "run_path",
-        lambda path, run_name: paths.append((str(path), run_name, list(sys.argv))),
-    )
-    monkeypatch.setattr(
-        root_eval.runpy,
-        "run_path",
-        lambda path, run_name: paths.append((str(path), run_name, list(sys.argv))),
-    )
-    root_train.main(["lr", "--num-tasks", "2"])
-    root_train.main(["beta-bernoulli", "--help"])
-    root_eval.main(["plot-lr-sweep", "--help"])
-    assert paths[0][1] == paths[1][1] == paths[2][1] == "__main__"
-    assert paths[0][2] == ["train.py", "--num-tasks", "2"]
-    assert paths[1][2] == ["beta_bernoulli.py", "--help"]
-
-    monkeypatch.setattr(sys, "argv", ["train.py", "bau"])
-    root_train.main(None)
-    monkeypatch.setattr(sys, "argv", ["eval.py", "plot-bau-sweep"])
-    root_eval.main(None)
-    assert len(paths) == 5

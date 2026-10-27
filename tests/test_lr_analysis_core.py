@@ -7,12 +7,12 @@ import pytest
 import torch
 from torch import nn
 
-import analysis.checkpoints as checkpoint_helpers
-from linear_regression.analysis.config import SweepConfig
-import linear_regression.analysis.data as analysis_data
-import linear_regression.analysis.metrics as analysis_metrics
-from linear_regression.analysis.data import PromptData
-from linear_regression.priors import DiscretePrior
+import bft_pmc.analysis.checkpoints as checkpoint_helpers
+import bft_pmc.linear_regression.analysis.data as analysis_data
+import bft_pmc.linear_regression.analysis.metrics as analysis_metrics
+from bft_pmc.linear_regression.analysis.config import SweepConfig
+from bft_pmc.linear_regression.analysis.data import PromptData
+from bft_pmc.linear_regression.priors import DiscretePrior
 from pfn_transformerlens.model.PFN import DistributionPrediction
 
 
@@ -38,16 +38,30 @@ class PredictiveRegressionModel(nn.Module):
 def _fake_pmc(
     *,
     model: PredictiveRegressionModel,
+    forward_recursion_steps: int,
     forward_recursion_samples: int,
     init_x: torch.Tensor | None,
+    save_rollouts: bool = False,
     **kwargs: object,
-) -> np.ndarray:
+) -> np.ndarray | tuple[np.ndarray, np.ndarray, np.ndarray]:
     del kwargs
-    if init_x is None:
-        return np.zeros((forward_recursion_samples, model.task_size))
-    if init_x.ndim == 2:
-        return np.zeros((forward_recursion_samples, model.task_size))
-    return np.zeros((init_x.shape[0], forward_recursion_samples, model.task_size))
+    if init_x is None or init_x.ndim == 2:
+        betas = np.zeros((forward_recursion_samples, model.task_size))
+        rollout_shape = (forward_recursion_samples, forward_recursion_steps)
+    else:
+        betas = np.zeros((init_x.shape[0], forward_recursion_samples, model.task_size))
+        rollout_shape = (
+            init_x.shape[0],
+            forward_recursion_samples,
+            forward_recursion_steps,
+        )
+    if save_rollouts:
+        return (
+            betas,
+            np.zeros((*rollout_shape, model.task_size)),
+            np.zeros(rollout_shape),
+        )
+    return betas
 
 
 def test_checkpoint_discovery_and_metadata_loading(
@@ -362,3 +376,28 @@ def test_lr_all_predictive_metrics_and_result_merging(
     merged = analysis_metrics.merge_results(predictive, distribution)
     assert merged.iloc[0]["mse"] == 1.0
     assert SweepConfig(noise_std=0.5).noise_variance == pytest.approx(0.25)
+
+
+def test_sweep_config_rejects_non_positive_chunking() -> None:
+    from bft_pmc.linear_regression.analysis.config import SweepConfig
+
+    with pytest.raises(ValueError, match="chunk_size"):
+        SweepConfig(chunk_size=0).validate()
+    with pytest.raises(ValueError, match="chunk_size"):
+        SweepConfig(prompt_chunk_size=0).validate()
+
+
+def test_dmmse_weights_survive_a_long_out_of_distribution_prompt() -> None:
+    """Float32 log-likelihoods of magnitude ~1e3 left the sum ~1e-5 off one."""
+    torch.manual_seed(0)
+    prior = DiscretePrior(task_size=8, num_tasks=32)
+    # 32 observations drawn from a task far outside the pool: residuals are large,
+    # so the log-likelihoods are large-magnitude and precision matters.
+    xs = torch.randn(32, 8)
+    ys = xs @ torch.full((8,), 25.0) + torch.randn(32)
+
+    weights = analysis_metrics.compute_dmmse_weights(xs, ys, prior, 0.25)
+    assert weights.dtype == np.float64
+    assert (weights >= 0).all()
+    # the plotters validate with atol=1e-6; double precision clears it by orders
+    assert abs(weights.sum() - 1.0) < 1e-12

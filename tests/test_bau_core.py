@@ -5,7 +5,7 @@ import pytest
 import torch
 from torch import nn
 
-from balls_and_urns.baselines import (
+from bft_pmc.balls_and_urns.baselines import (
     dirichlet_posterior_alpha,
     discrete_posterior_weights,
     generalising_predictive,
@@ -13,13 +13,13 @@ from balls_and_urns.baselines import (
     sample_generalising_posterior,
     sample_memorising_posterior,
 )
-from balls_and_urns.data import (
+from bft_pmc.balls_and_urns.data import (
     BOSGenerator,
     make_bau_generator,
     make_discrete_bau_generator,
     make_generator_from_pool,
 )
-from balls_and_urns.dataset import (
+from bft_pmc.balls_and_urns.dataset import (
     load_generalising_dataset,
     load_memorising_dataset,
     load_predictive_samples,
@@ -27,8 +27,13 @@ from balls_and_urns.dataset import (
     save_memorising_dataset,
     save_predictive_samples,
 )
-from balls_and_urns.evals import BAUEvaluator, _cross_entropy, _mse, _per_position_ce
-from balls_and_urns.predictive_monte_carlo import (
+from bft_pmc.balls_and_urns.evals import (
+    BAUEvaluator,
+    _cross_entropy,
+    _mse,
+    _per_position_ce,
+)
+from bft_pmc.balls_and_urns.predictive_monte_carlo import (
     predictive_monte_carlo_theta,
     predictive_monte_carlo_theta_chunked,
 )
@@ -185,6 +190,34 @@ def test_bau_predictive_monte_carlo_prompt_and_chunk_paths() -> None:
         chunk_size=2,
     )
     assert chunked.shape == (5, 2)
+
+    with_rollouts, rollout_tokens = predictive_monte_carlo_theta(
+        model,
+        vocab_size=2,
+        forward_recursion_steps=4,
+        num_rollouts=3,
+        prompt=prompt,
+        bos_token=2,
+        save_rollouts=True,
+    )
+    # rollouts keep the prompt states and drop BOS
+    assert with_rollouts.shape == (3, 2)
+    assert rollout_tokens.shape == (3, 6)
+    assert rollout_tokens.dtype == np.int16
+    np.testing.assert_array_equal(
+        rollout_tokens[:, :2], np.tile(prompt.numpy(), (3, 1))
+    )
+
+    chunked_thetas, chunked_rollouts = predictive_monte_carlo_theta_chunked(
+        model,
+        vocab_size=2,
+        forward_recursion_steps=4,
+        num_rollouts=5,
+        chunk_size=2,
+        save_rollouts=True,
+    )
+    assert chunked_thetas.shape == (5, 2)
+    assert chunked_rollouts.shape == (5, 4)
 
 
 def test_bau_evaluator_and_scalar_metrics() -> None:

@@ -1,8 +1,14 @@
-# Un-ignore data assets that the global gitignore excludes by extension.
+# Un-ignore data assets that a global gitignore may exclude by extension.
 # paper_data/ is committed data; track it regardless of extension.
 !*.csv
 !*.npz
+!beta_bernoulli/model.pt
 
 # Figures are regenerable from the data files; keep them out of the repo.
 *.png
 *.pdf
+
+# Except the rebuttal-period figures: their per-rollout inputs were not kept,
+# so these files are the only record of how they looked.
+!rebuttal_diagnostics/**/*.png
+!rebuttal_diagnostics/**/*.pdf

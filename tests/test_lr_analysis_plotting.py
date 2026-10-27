@@ -5,8 +5,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from linear_regression.analysis.config import SweepConfig
-from linear_regression.analysis.plotting import (
+from bft_pmc.linear_regression.analysis.config import SweepConfig
+from bft_pmc.linear_regression.analysis.plotting import (
     plot_marginal_distributions,
     plot_per_prompt_marginals,
     plot_results,

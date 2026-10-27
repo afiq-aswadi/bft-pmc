@@ -8,7 +8,7 @@ import pandas as pd
 import pytest
 import torch
 
-from markov.plotting import (
+from bft_pmc.markov.plotting import (
     HeatmapThresholdLocation,
     _default_transitions,
     _empirical_cdf,
