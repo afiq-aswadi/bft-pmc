@@ -25,6 +25,7 @@ store holds the pre-retraining runs).
 | `lr_grid_marginal_4dim_T8_*` (3), `lr_stitched_*` (6), `lr_1x1_M8_dim0.pdf` (1) | `eval.py plot-lr-marginals --num-dims 4`, `plot-lr-stitched-marginals`, `plot-lr-single-marginal` | LR sweep `samples/*.npz` | cluster: `outputs/lr/sweep_analysis_{learned,rope,none}/sweep_*/` |
 | `bau_grid_marginal_4dim_*` (3), `stitched_bau_*` (6) | `eval.py plot-bau-marginals --num-dims 4`, `plot-bau-stitched-marginals` | balls-and-urns sweep `samples/*.npz` | cluster: `outputs/bau/sweep_analysis_{learned,rope,none}/*/` |
 | `markov_K4_M4_*` (3), `markov_full_M*` (60) | `eval.py plot-markov-marginals --prompt-length 32` (K4: `--max-classes 4 --n-chains 4 --print-frac 0.45`) | Markov `samples/M{n}_{prior,in_distribution_L32,out_of_distribution_L32}.npz` | cluster: `outputs/markov/sweep_analysis/samples/` |
+| `prior_shape_discrimination` (1: Appendix H.1) | `eval.py prior-shape --run-template 'lr_m{m}_none_prior_r8192' --length 223 --task-diversities 32 128 256 512 1024 4096 16384 65536 --n-blocks 32 --match-variance` (`slurm/prior_shape.slurm` runs it twice, with and without `--match-variance`; only the matched run backs the appendix) | the eight R=8192 prior rollout bundles, `prior_trajectories.npz`; the written JSON records each input's SHA-256 | cluster: `outputs/pmc_diagnostics/lr_m{m}_none_prior_r8192/` |
 | `reliability_*` (41: Appendix D and the supplement) | `eval.py plot-reliability --diagnostics-root paper_data/camera_ready/pmc_diagnostics --paper-dir ../icl2latex` | the per-run CSVs and run records of 37 diagnostics runs; the written `reliability_figure_manifest.json` records every input's SHA-256 and every plotted value | repo: `paper_data/camera_ready/pmc_diagnostics/` (copied from `outputs/pmc_diagnostics/`) |
 | `ar-pfn-mask.pgf` (1) | **unknown**: no generator in this repository | none (schematic) | — |
 
@@ -32,8 +33,7 @@ store holds the pre-retraining runs).
 options, for all three positional encodings; `scripts/rebuild_sweep_figures.sh`
 does the same for the sweep figures. Prefer them to reconstructing the calls by
 hand. Numbers quoted in the text rather than plotted come from
-`eval.py prior-shape` (Gaussian against Laplace prior, `slurm/prior_shape.slurm`)
-and `eval.py predictive-fidelity` (`slurm/predictive_fidelity.slurm`).
+`eval.py predictive-fidelity` (`slurm/predictive_fidelity.slurm`).
 
 ## Traps
 

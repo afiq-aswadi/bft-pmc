@@ -203,11 +203,23 @@ def figure(
     ax.legend(frameon=False, fontsize=6, loc="lower center")
     ax.set_title("(a) Pooled marginal", fontsize=7)
 
-    # (b) paired margin with its block standard error: above zero means the Gaussian
-    # reference is closer, which is what the claim requires.
+    # (b) paired margin against the two calibration lines the appendix quotes:
+    # zero, which is also exactly where the prediction-space comparison sits,
+    # and one, the separation a true Gaussian sample of this size achieves.
     ax = axes[1]
     xs = np.arange(len(rows))
-    for offset, metric, color in ((-0.12, "ed", "#1f77b4"), (0.12, "sw", "#2ca02c")):
+
+    # Delta_MSE is pinned to zero here, not merely small: with an empty prompt
+    # both priors predict E[w]^T x = 0 at every query, so the prediction-space
+    # comparison between them vanishes at any rollout budget. Drawing it as a
+    # line makes the capability gap the panel's subject rather than a caption.
+    ax.axhline(0, color="#d62728", lw=1.0, zorder=1)
+    ax.axhline(1, color=".45", lw=0.7, ls=":", zorder=1)
+
+    for offset, metric, color, label in (
+        (-0.12, "ed", "#1f77b4", "Energy distance"),
+        (0.12, "sw", "#2ca02c", "Sliced Wasserstein-1"),
+    ):
         # Normalise by the oracle margin, not by the distance to the Gaussian:
         # energy distance is an unbiased U-statistic and goes negative once the
         # samples match the reference, which would flip the error bars. The
@@ -216,7 +228,16 @@ def figure(
         # this size achieves.
         denom = [max(abs(r[f"{metric}_margin_oracle"]), 1e-12) for r in rows]
         mean = [r[f"{metric}_margin"] / d for r, d in zip(rows, denom)]
-        err = [r[f"{metric}_margin_se"] / d for r, d in zip(rows, denom)]
+        # Error bars for sliced Wasserstein only. The energy distance is a
+        # U-statistic whose variance degenerates as the two samples approach the
+        # same law, so the block estimate does not extrapolate from block size to
+        # the full sample; the appendix reports those margins as point estimates
+        # and the figure must not imply an interval the text disclaims.
+        err = (
+            [r[f"{metric}_margin_se"] / d for r, d in zip(rows, denom)]
+            if metric == "sw"
+            else None
+        )
         ax.errorbar(
             xs + offset,
             mean,
@@ -226,15 +247,42 @@ def figure(
             lw=1,
             capsize=2,
             color=color,
-            label="Energy distance" if metric == "ed" else "Sliced Wasserstein-1",
+            label=label,
+            zorder=3,
         )
-    ax.axhline(0, color=".65", lw=0.6)
-    # Bare numbers: the sweep can run to M=65536, where "$M=65536$" per tick
-    # would collide.
-    ax.set_xticks(xs, [str(r["task_diversity"]) for r in rows], fontsize=6)
+
+    # Label both reference lines at the right edge, where the curves have
+    # flattened and leave the margin clear; the vertical gap separates them.
+    ax.annotate(
+        "oracle",
+        xy=(xs[-1] + 0.3, 1.0),
+        fontsize=5.5,
+        color=".35",
+        va="bottom",
+        ha="right",
+    )
+    ax.annotate(
+        "prediction space: exactly 0",
+        # Above the line and hard right: below it runs into the energy-distance
+        # point at M=128, the one diversity whose margin is negative.
+        xy=(xs[-1] + 0.3, 0.07),
+        fontsize=5.5,
+        color="#d62728",
+        va="bottom",
+        ha="right",
+    )
+
+    # Powers of two: the sweep reaches M=65536, where the bare numbers collide.
+    ax.set_xticks(
+        xs,
+        [f"$2^{{{int(round(np.log2(r['task_diversity'])))}}}$" for r in rows],
+        fontsize=6,
+    )
+    ax.set_xlim(xs[0] - 0.55, xs[-1] + 0.45)
     ax.set_xlabel("Task diversity $M$")
     ax.set_ylabel("Margin / oracle margin\n(Laplace $-$ Gaussian)", linespacing=2.0)
-    ax.legend(frameon=False, fontsize=6)
+    # Upper left is the only region both series leave empty.
+    ax.legend(frameon=False, fontsize=6, loc="upper left")
     ax.set_title("(b) Which reference is closer", fontsize=7)
     for side in ("top", "right"):
         for a in axes:
