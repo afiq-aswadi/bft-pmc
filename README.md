@@ -5,7 +5,7 @@
 [![Supplement PDF](https://img.shields.io/badge/Supplement-PDF-555555?style=for-the-badge)](icl2_supplementary.pdf)
 
 Code for *What does a Bayes-filtered transformer believe? A predictive Monte
-Carlo approach* (Aswadi, Ma and Wei, NeurIPS 2026). This is the camera-ready
+Carlo approach* (Effiezal Aswadi, Ma and Wei, NeurIPS 2026). This is the camera-ready
 release; [Camera-ready release](#camera-ready-release) lists what changed since
 the initial public release.
 
@@ -277,7 +277,7 @@ figures. Its source is the
 ```bibtex
 @inproceedings{aswadi2026bft,
   title     = {What does a {Bayes}-filtered transformer believe? {A} predictive {Monte Carlo} approach},
-  author    = {Aswadi, Afiq Abdillah Effiezal and Ma, Haotong and Wei, Susan},
+  author    = {Effiezal Aswadi, Afiq Abdillah and Ma, Haotong and Wei, Susan},
   booktitle = {Advances in Neural Information Processing Systems},
   year      = {2026}
 }

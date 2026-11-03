@@ -5,8 +5,8 @@ type: software
 license: MIT
 repository-code: "https://github.com/afiq-aswadi/bft-pmc"
 authors:
-  - given-names: Afiq Abdillah Effiezal
-    family-names: Aswadi
+  - given-names: Afiq Abdillah
+    family-names: Effiezal Aswadi
     affiliation: Monash University
   - given-names: Haotong
     family-names: Ma
@@ -20,8 +20,8 @@ preferred-citation:
   collection-title: "Advances in Neural Information Processing Systems"
   year: 2026
   authors:
-    - given-names: Afiq Abdillah Effiezal
-      family-names: Aswadi
+    - given-names: Afiq Abdillah
+      family-names: Effiezal Aswadi
     - given-names: Haotong
       family-names: Ma
     - given-names: Susan
