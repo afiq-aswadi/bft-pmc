@@ -9,11 +9,15 @@ from __future__ import annotations
 
 import csv
 import json
+import re
 from pathlib import Path
 
+import matplotlib
+import matplotlib.pyplot as plt
 import pytest
 
 from bft_pmc.analysis import plot_reliability_appendix as appendix
+from bft_pmc.plotting.paper_style import BASE_FONT_PT
 
 REFS = ("memorising", "generalising")
 METRICS = ("ed", "sw")
@@ -167,3 +171,75 @@ def test_manifest_records_the_plotted_values_and_input_hashes(
 def test_markov_n500_runs_follow_their_submission_names() -> None:
     assert appendix.markov_n500_run(32) == "markov_m32_n500_pi544"
     assert appendix.markov_n500_run(64) == "markov_m64_n500"
+
+
+def _page_width_in(path: Path) -> float:
+    box = re.search(
+        rb"/MediaBox\s*\[\s*([\d.]+)\s+([\d.]+)\s+([\d.]+)\s+([\d.]+)\s*\]",
+        path.read_bytes(),
+    )
+    assert box is not None
+    x0, _, x1, _ = (float(value) for value in box.groups())
+    return (x1 - x0) / 72
+
+
+def test_print_widths_match_the_paper() -> None:
+    """The widths icl2.tex prints the Appendix D figures at."""
+    families = ("lr", "bau", "markov")
+    expected = {
+        **{f"reliability_path_stability_{f}.pdf": 0.60 for f in families},
+        **{
+            f"reliability_{kind}_{source}.pdf": 0.75
+            for kind in ("length", "count")
+            for source in ("prior", "posterior")
+        },
+        **{f"reliability_taskdiv_length_{f}.pdf": 0.65 for f in families},
+        **{f"reliability_dimension_{f}.pdf": 0.65 for f in ("bau", "markov")},
+        **{f"reliability_taskdiv_{f}.pdf": 0.65 for f in families},
+    }
+    assert appendix.PRINT_WIDTH == expected
+
+
+def test_every_figure_is_drawn_at_its_print_width(drawn: tuple[Path, Path]) -> None:
+    _, paper = drawn
+    manifest = json.loads((paper / appendix.MANIFEST_NAME).read_text())
+    for entry in manifest["figures"]:
+        name = entry["figure"].removeprefix("figures/")
+        expected = appendix.FIGURE_WIDTH_IN * appendix.PRINT_WIDTH.get(name, 1.0)
+        assert _page_width_in(paper / entry["figure"]) == pytest.approx(
+            expected, abs=0.01
+        )
+
+
+@pytest.mark.parametrize(("nrows", "bottom"), [(2, 0.15), (3, 0.10)])
+def test_full_width_grid_keeps_the_original_layout(nrows: int, bottom: float) -> None:
+    fig, axes = appendix.ReliabilityFigures.make_axes(nrows)
+    try:
+        assert axes.shape == (nrows, 2)
+        assert tuple(fig.get_size_inches()) == pytest.approx((5.5, 0.65 + 1.35 * nrows))
+        params = fig.subplotpars
+        assert (params.left, params.right, params.bottom, params.top) == pytest.approx(
+            (0.15, 0.985, bottom, 0.91)
+        )
+        assert (params.wspace, params.hspace) == pytest.approx((0.36, 0.48))
+    finally:
+        plt.close(fig)
+
+
+def test_narrow_grid_keeps_margins_and_text_size() -> None:
+    full, _ = appendix.ReliabilityFigures.make_axes(3)
+    full_panel = full.axes[0].get_position().width * full.get_size_inches()[0]
+    plt.close(full)
+    fig, _ = appendix.ReliabilityFigures.make_axes(3, 0.75)
+    try:
+        width, height = fig.get_size_inches()
+        params = fig.subplotpars
+        assert width == pytest.approx(0.75 * 5.5)
+        assert params.left * width == pytest.approx(0.15 * 5.5)
+        assert (1 - params.right) * width == pytest.approx(0.015 * 5.5)
+        assert params.bottom * height == pytest.approx(0.10 * (0.65 + 1.35 * 3))
+        assert (1 - params.top) * height == pytest.approx(0.09 * (0.65 + 1.35 * 3))
+        assert fig.axes[0].get_position().width * width < full_panel
+        assert matplotlib.rcParams["font.size"] == pytest.approx(BASE_FONT_PT)
+    finally:
+        plt.close(fig)
