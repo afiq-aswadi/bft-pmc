@@ -24,6 +24,10 @@ Figures are written as ``<paper-dir>/figures/<name>.pdf``:
 ``reliability_supp_*``
     The per-family and per-encoding length and count curves of the supplement.
 
+Each figure is drawn at the width it prints at in the paper (``PRINT_WIDTH``),
+so its text comes out at the paper's print sizes. The Appendix D figures print
+narrower than the text width; the supplement figures fill it.
+
 Which diagnostics run feeds which figure is fixed below; the comments explain
 the choices (rollout horizon, independent count pools, hardware).
 """
@@ -53,6 +57,20 @@ COLORS = {"memorising": "#2ca02c", "generalising": "#1f77b4"}
 """Reference posterior -> line colour, shared with every other paper figure."""
 
 FIGURE_WIDTH_IN = 5.5
+PRINT_WIDTH = {
+    **{f"reliability_path_stability_{f}.pdf": 0.60 for f in ("lr", "bau", "markov")},
+    **{
+        f"reliability_{kind}_{source}.pdf": 0.75
+        for kind in ("length", "count")
+        for source in ("prior", "posterior")
+    },
+    **{f"reliability_taskdiv_length_{f}.pdf": 0.65 for f in ("lr", "bau", "markov")},
+    **{f"reliability_dimension_{f}.pdf": 0.65 for f in ("bau", "markov")},
+    **{f"reliability_taskdiv_{f}.pdf": 0.65 for f in ("lr", "bau", "markov")},
+}
+"""Fraction of the text width each Appendix D figure prints at in the paper
+(``width=<f>\\linewidth``). Figures not listed, the supplement's among them,
+print at full width."""
 CREATOR = "plot_reliability_appendix.py"
 MANIFEST_NAME = "reliability_figure_manifest.json"
 
@@ -97,19 +115,35 @@ class ReliabilityFigures:
     # -- layout --------------------------------------------------------------
 
     @staticmethod
-    def make_axes(nrows: int) -> tuple[Figure, np.ndarray]:
-        """A ``nrows`` x 2 grid: energy distance left, sliced Wasserstein right."""
-        apply_paper_style(FIGURE_WIDTH_IN)
-        fig, axes = plt.subplots(
-            nrows, 2, figsize=(FIGURE_WIDTH_IN, 0.65 + 1.35 * nrows), squeeze=False
-        )
+    def make_axes(nrows: int, width_frac: float = 1.0) -> tuple[Figure, np.ndarray]:
+        """A ``nrows`` x 2 grid: energy distance left, sliced Wasserstein right.
+
+        ``width_frac`` is the fraction of the text width the figure prints at.
+        Text keeps its print size and the margins and gaps keep their
+        full-width size in inches, so a narrower figure only shrinks its panels.
+        """
+        full_height = 0.65 + 1.35 * nrows
+        bottom_frac = 0.15 if nrows == 2 else 0.10
+        # The full-width layout, in inches.
+        left, right = 0.15 * FIGURE_WIDTH_IN, 0.015 * FIGURE_WIDTH_IN
+        bottom, top = bottom_frac * full_height, 0.09 * full_height
+        panel_width = FIGURE_WIDTH_IN * (0.985 - 0.15) / (2 + 0.36)
+        panel_height = full_height * (0.91 - bottom_frac) / (nrows + 0.48 * (nrows - 1))
+        column_gap, row_gap = 0.36 * panel_width, 0.48 * panel_height
+        # The printed figure: same margins and gaps, smaller panels.
+        width = FIGURE_WIDTH_IN * width_frac
+        panel_width = (width - left - right - column_gap) / 2
+        panel_height *= width_frac
+        height = bottom + top + nrows * panel_height + (nrows - 1) * row_gap
+        apply_paper_style(width, width_frac)
+        fig, axes = plt.subplots(nrows, 2, figsize=(width, height), squeeze=False)
         fig.subplots_adjust(
-            left=0.15,
-            right=0.985,
-            bottom=0.15 if nrows == 2 else 0.10,
-            top=0.91,
-            hspace=0.48,
-            wspace=0.36,
+            left=left / width,
+            right=1 - right / width,
+            bottom=bottom / height,
+            top=1 - top / height,
+            hspace=row_gap / panel_height,
+            wspace=column_gap / panel_width,
         )
         for ax in axes.flat:
             ax.spines[["top", "right"]].set_visible(False)
@@ -177,7 +211,7 @@ class ReliabilityFigures:
         N = 223 training-context rule on length plots; runs that stop at
         N = 223 pass False, since the rule would sit on their last point.
         """
-        fig, axes = self.make_axes(len(specs))
+        fig, axes = self.make_axes(len(specs), PRINT_WIDTH.get(name, 1.0))
         panels: list[Panel] = []
         inputs: list[Path] = []
         for i, (label, run) in enumerate(specs):
@@ -259,7 +293,7 @@ class ReliabilityFigures:
         )
         path = self.root / run / filename
         data = read_rows(path)
-        fig, axes = self.make_axes(2)
+        fig, axes = self.make_axes(2, PRINT_WIDTH.get(name, 1.0))
         panels: list[Panel] = []
         for i, source in enumerate(["prior", "posterior"]):
             subset = sorted(
@@ -314,10 +348,22 @@ class ReliabilityFigures:
         extended = self.root / "jellyfish_m32_n500/path_stability_per_prompt.csv"
         encodings = {"lr": "none", "bau": "none", "markov": "markov"}
         data = read_rows(extended)
-        apply_paper_style(FIGURE_WIDTH_IN)
         for family, encoding in encodings.items():
-            fig, ax = plt.subplots(1, 1, figsize=(FIGURE_WIDTH_IN, 2.1))
-            fig.subplots_adjust(left=0.13, right=0.985, bottom=0.21, top=0.96)
+            name = f"reliability_path_stability_{family}.pdf"
+            width_frac = PRINT_WIDTH.get(name, 1.0)
+            # Margins keep their full-width size in inches; the panel shrinks.
+            left, right = 0.13 * FIGURE_WIDTH_IN, 0.015 * FIGURE_WIDTH_IN
+            bottom, top = 0.21 * 2.1, 0.04 * 2.1
+            width = FIGURE_WIDTH_IN * width_frac
+            height = bottom + top + (0.96 - 0.21) * 2.1 * width_frac
+            apply_paper_style(width, width_frac)
+            fig, ax = plt.subplots(1, 1, figsize=(width, height))
+            fig.subplots_adjust(
+                left=left / width,
+                right=1 - right / width,
+                bottom=bottom / height,
+                top=1 - top / height,
+            )
             groups: dict[tuple[str, str], list[dict[str, str]]] = {}
             for row in data:
                 if row["family"] == family and row["pos_encoding"] == encoding:
@@ -335,7 +381,7 @@ class ReliabilityFigures:
             ax.set_ylabel("Scaled $L_1$")
             ax.spines[["top", "right"]].set_visible(False)
             ax.grid(alpha=0.14, lw=0.5)
-            self.finish(fig, f"reliability_path_stability_{family}.pdf", [extended], [])
+            self.finish(fig, name, [extended], [])
 
     # -- manifest ------------------------------------------------------------
 
