@@ -2,7 +2,6 @@
 
 [![Interactive supplement](https://img.shields.io/badge/Interactive_supplement-Open-1f6feb?style=for-the-badge)](https://bft-pmc.github.io/)
 [![Paper](https://img.shields.io/badge/Paper-OpenReview-8c1b13?style=for-the-badge)](https://openreview.net/forum?id=qZ5gMk6Gpd)
-[![Supplement PDF](https://img.shields.io/badge/Supplement-PDF-555555?style=for-the-badge)](icl2_supplementary.pdf)
 
 Code for *What does a Bayes-filtered transformer believe? A predictive Monte
 Carlo approach* (Effiezal Aswadi, Ma and Wei, NeurIPS 2026). This is the camera-ready
@@ -42,7 +41,7 @@ at M = 32 (right), from the frozen data in `paper_data/`.*
 - [Running the experiments](#running-the-experiments)
 - [Tests](#tests)
 - [Camera-ready release](#camera-ready-release)
-- [Supplementary material](#supplementary-material)
+- [Interactive supplement](#interactive-supplement)
 - [Citation](#citation)
 
 ## Installation
@@ -105,7 +104,6 @@ slurm/                       SLURM jobs for every paper run, with their settings
 tests/                       test suite (100% line coverage)
 pfn_transformers/            vendored PFN TransformerLens library, with its own tests
 assets/                      README figure
-icl2_supplementary.pdf       the paper's supplement: more reliability diagnostics, every PMC marginal
 ```
 
 Each family package has a README listing its modules:
@@ -254,15 +252,7 @@ name. Other paths changed:
 | `scripts/compute_lr_prior_delta_mse.py`, `scripts/compute_bau_prior_predictive_kl.py`, `scripts/compute_markov_prior_predictive_kl.py` | `eval.py lr-prior-delta-mse`, `eval.py bau-prior-kl`, `eval.py markov-prior-kl` |
 | `MODEL_ZOO.md`, `paper_data/FIGURE_PROVENANCE.md` | [`docs/model_zoo.md`](docs/model_zoo.md), [`docs/figure_provenance.md`](docs/figure_provenance.md) |
 
-## Supplementary material
-
-[`icl2_supplementary.pdf`](icl2_supplementary.pdf) is the paper's supplement.
-Its first part extends the reliability diagnostics of Appendix D: prior and
-posterior recovery against rollout length and count for each family at
-horizon N = 223, for linear regression and balls and urns also at N = 500, and
-for the learned and rotary positional-encoding models. The second part gives
-every PMC-recovered marginal density and CDF for all three task families at
-every task diversity; the paper shows a representative subset.
+## Interactive supplement
 
 The [interactive supplement](https://bft-pmc.github.io/) draws the
 recovered distributions in the browser from PMC samples: pick a task family, a
