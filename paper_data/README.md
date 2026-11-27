@@ -13,6 +13,9 @@ positional encoding for LR and balls-and-urns, 256 positions everywhere, a
 32-observation prompt). Their inputs are frozen separately in
 [`camera_ready/`](camera_ready/README.md): the LR and balls-and-urns sweep
 metrics and every input of the 41 reliability figures.
+The paper's Markov figures are all drawn from `camera_ready/markov/` (the
+August runs); `markov/` is kept as the record of the April runs and backs none
+of them.
 [`docs/figure_provenance.md`](../docs/figure_provenance.md) says which input
 each paper figure uses. Each snapshot keeps the `config.json` it was produced
 with, written by the code of that time, so some keys (the Laplace options of
@@ -30,7 +33,7 @@ paper_data/
     sweep/                 aggregate task-diversity metrics, prior-only (R=1024) metrics, prior KL sidecar
     dynamics/              aggregate and per-prompt M=32 training dynamics
     eval_datasets/         fixed generalizing and per-run memorizing prompts
-  markov/
+  markov/                  the April runs; the paper's Markov figures use camera_ready/markov/
     sweep/                 aggregate ED/SW metrics, prior-only metrics, prior KL, per-run KL histories
     dynamics_m32/          M=32 aggregate and per-prompt metrics and KL history
     dynamics_m8/           M=8 aggregate and per-prompt metrics and KL history
@@ -75,6 +78,8 @@ uv run eval.py plot-bau-prior --metrics-csv paper_data/bau/sweep/metrics_prior_n
     --kl-csv paper_data/bau/sweep/prior_predictive_kl.csv \
     --out-path outputs/paper_reproduction/bau/sweep/sweep_prior_kl_ed_sw.png
 
+# The April Markov runs; the paper's figures come from camera_ready/markov/
+# (commands in camera_ready/README.md).
 uv run eval.py plot-markov-sweep --runs-dir paper_data/markov/sweep/runs \
     --metrics-csv paper_data/markov/sweep/metrics.csv \
     --out-path outputs/paper_reproduction/markov/sweep/sweep_combined.png

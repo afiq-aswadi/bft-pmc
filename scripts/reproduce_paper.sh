@@ -4,6 +4,8 @@
 #   - the Beta-Bernoulli figures (Figure 1) and the identifiability example (Figure 2);
 #   - from paper_data/camera_ready/: the camera-ready LR and balls-and-urns sweep
 #     figures and all 41 reliability figures of Appendix D and the supplement;
+#   - from paper_data/camera_ready/markov/: the paper's five Markov sweep, prior
+#     and training-dynamics figures (the August runs);
 #   - from paper_data/{lr,bau,markov}/: the aggregate task-diversity, prior and
 #     training-dynamics figures of the original runs (see paper_data/README.md).
 #
@@ -45,6 +47,25 @@ uv run eval.py plot-reliability \
     --diagnostics-root paper_data/camera_ready/pmc_diagnostics \
     --paper-dir "${OUTPUT_ROOT}/camera_ready/reliability"
 
+# The paper's Markov figures. These runs keep their KL history in each run's
+# training_log.csv, so it arrives through --training-root. The prior figure is
+# the two-panel one drawn without --kl-csv, and the paper's *_2x2 figures are
+# the *_2x2_sw outputs; paper_data/camera_ready/README.md says why.
+uv run eval.py plot-markov-sweep \
+    --metrics-csv paper_data/camera_ready/markov/sweep/metrics.csv \
+    --runs-dir paper_data/camera_ready/markov/sweep/runs \
+    --training-root paper_data/camera_ready/markov/training \
+    --out-path "${OUTPUT_ROOT}/camera_ready/markov/markov_sweep_combined.png"
+
+uv run eval.py plot-markov-prior \
+    --metrics-csv paper_data/camera_ready/markov/sweep/metrics.csv \
+    --out-path "${OUTPUT_ROOT}/camera_ready/markov/markov_sweep_prior_kl_ed_sw.png"
+
+uv run eval.py plot-markov-dynamics \
+    --runs-dir paper_data/camera_ready/markov/sweep/runs \
+    --training-root paper_data/camera_ready/markov/training \
+    --out-dir "${OUTPUT_ROOT}/camera_ready/markov/dynamics"
+
 # ---- Original-run figures ----------------------------------------------------
 
 uv run eval.py plot-lr-sweep \
@@ -79,6 +100,8 @@ uv run eval.py plot-bau-prior \
     --kl-csv paper_data/bau/sweep/prior_predictive_kl.csv \
     --out-path "${OUTPUT_ROOT}/bau/sweep/sweep_prior_kl_ed_sw.png"
 
+# The April Markov runs (1024-token sequences, prompts of length 8): the
+# submission's figures, superseded in the paper by the camera-ready ones above.
 uv run eval.py plot-markov-sweep \
     --runs-dir paper_data/markov/sweep/runs \
     --metrics-csv paper_data/markov/sweep/metrics.csv \
