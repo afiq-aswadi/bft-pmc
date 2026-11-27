@@ -20,20 +20,21 @@ store holds the pre-retraining runs).
 | `intro_identifiability_spike_slab` (1) | `eval.py plot-identifiability` | analytic, no data | — |
 | `lr_sweep_combined_2x2`, `bau_sweep_posterior{,_2x2}` (3) | `eval.py plot-lr-sweep --prompt-length 32`, `plot-bau-sweep` | the no-positional-encoding sweeps' `metrics.csv` (`outputs/lr/sweep_analysis_none/sweep_20260821_221637/`, `outputs/bau/sweep_analysis_none/20260819_194316/`) | repo: `paper_data/camera_ready/{lr,bau}/sweep/` |
 | `lr_sweep_prior_delta_ed_sw`, `bau_sweep_prior_kl_ed_sw` (2) | `eval.py plot-lr-prior`, `plot-bau-prior` | the same `metrics.csv`, plus the prior sidecar CSVs (`prior_delta_mse.csv`, `prior_predictive_kl.csv`) of those sweeps | sidecars: cluster |
-| `markov_sweep_combined{,_2x2}`, `markov_sweep_prior_kl_ed_sw` (3) | `eval.py plot-markov-sweep`, `plot-markov-prior` | `paper_data/markov/sweep/` (unverified; see the correction below) | repo |
-| `lr_dynamics_combined_logx_2x2`, `bau_dynamics_combined_logx{,_2x2}`, `markov_dynamics_M8{,_2x2}` (5) | `eval.py plot-lr-dynamics`, `plot-bau-dynamics`, `plot-markov-dynamics` | `paper_data/{lr,bau}/dynamics/`, `paper_data/markov/dynamics_m8/` (unverified; see below) | repo |
+| `markov_sweep_combined{,_2x2}`, `markov_sweep_prior_kl_ed_sw` (3) | `eval.py plot-markov-sweep`, `plot-markov-prior` | `paper_data/camera_ready/markov/sweep/` plus `markov/training/` for the KL history; all three verified byte-identical on 2026-11-13 | repo |
+| `lr_dynamics_combined_logx_2x2`, `bau_dynamics_combined_logx{,_2x2}`, `markov_dynamics_M8{,_2x2}` (5) | `eval.py plot-lr-dynamics`, `plot-bau-dynamics`, `plot-markov-dynamics` | `paper_data/{lr,bau}/dynamics/` (unverified; see below); Markov from `paper_data/camera_ready/markov/{sweep/runs,training}/`, both figures verified byte-identical on 2026-11-13 | repo |
 | `lr_grid_marginal_4dim_T8_*` (3), `lr_stitched_*` (6), `lr_1x1_M8_dim0.pdf` (1) | `eval.py plot-lr-marginals --num-dims 4`, `plot-lr-stitched-marginals`, `plot-lr-single-marginal` | LR sweep `samples/*.npz` | cluster: `outputs/lr/sweep_analysis_{learned,rope,none}/sweep_*/` |
 | `bau_grid_marginal_4dim_*` (3), `stitched_bau_*` (6) | `eval.py plot-bau-marginals --num-dims 4`, `plot-bau-stitched-marginals` | balls-and-urns sweep `samples/*.npz` | cluster: `outputs/bau/sweep_analysis_{learned,rope,none}/*/` |
 | `markov_K4_M4_*` (3), `markov_full_M*` (60) | `eval.py plot-markov-marginals --prompt-length 32` (K4: `--max-classes 4 --n-chains 4 --print-frac 0.45`) | Markov `samples/M{n}_{prior,in_distribution_L32,out_of_distribution_L32}.npz` | cluster: `outputs/markov/sweep_analysis/samples/` |
-| `reliability_*` (41: Appendix D and the supplement) | `eval.py plot-reliability --diagnostics-root paper_data/camera_ready/pmc_diagnostics --paper-dir ../icl2latex` | the per-run CSVs and run records of 37 diagnostics runs; the written `reliability_figure_manifest.json` records every input's SHA-256 and every plotted value | repo: `paper_data/camera_ready/pmc_diagnostics/` (copied from `outputs/pmc_diagnostics/`) |
+| `prior_shape_discrimination` (1: Appendix H.1) | `eval.py prior-shape --run-template 'lr_m{m}_none_prior_r8192' --length 223 --task-diversities 32 128 256 512 1024 4096 16384 65536 --n-blocks 32 --match-variance` (`slurm/prior_shape.slurm` runs it twice, with and without `--match-variance`; only the matched run backs the appendix) | the eight R=8192 prior rollout bundles, `prior_trajectories.npz`; the written JSON records each input's SHA-256 | cluster: `outputs/pmc_diagnostics/lr_m{m}_none_prior_r8192/` |
+| `reliability_*` (42: Appendix D and the supplement) | `eval.py plot-reliability --diagnostics-root paper_data/camera_ready/pmc_diagnostics --paper-dir ../icl2latex` | the per-run CSVs and run records of 37 diagnostics runs and, for `reliability_agreement`, the per-position CSVs of `eval.py predictive-fidelity`; the written `reliability_figure_manifest.json` records every input's SHA-256 and every plotted value | repo: `paper_data/camera_ready/{pmc_diagnostics,predictive_fidelity}/` (copied from `outputs/`) |
 | `ar-pfn-mask.pgf` (1) | **unknown**: no generator in this repository | none (schematic) | — |
 
 `scripts/rebuild_marginals.sh` regenerates every marginal grid, with the right
 options, for all three positional encodings; `scripts/rebuild_sweep_figures.sh`
 does the same for the sweep figures. Prefer them to reconstructing the calls by
-hand. Numbers quoted in the text rather than plotted come from
-`eval.py prior-shape` (Gaussian against Laplace prior, `slurm/prior_shape.slurm`)
-and `eval.py predictive-fidelity` (`slurm/predictive_fidelity.slurm`).
+hand. The next-token agreement numbers come from `eval.py predictive-fidelity`
+(`slurm/predictive_fidelity.slurm`); `plot-reliability` draws them per position
+as `reliability_agreement`.
 
 ## Traps
 
@@ -75,8 +76,33 @@ and `paper_data/{lr,bau}/sweep/metrics.csv` is superseded. The two disagree
 materially: the stale balls-and-urns file puts the posterior switch at
 $M=2^8$–$2^9$ and shows no prediction-space switch at all, whereas the NoPE run
 gives $2^7$–$2^8$ and $2^9$–$2^{10}$, which is what the paper states and what
-was verified against these CSVs. The Markov sweep row and the dynamics row
-carry the same risk and have **not** been re-checked.
+was verified against these CSVs. The Markov sweep and dynamics rows carried
+the same risk and were resolved on 2026-11-13 (see the correction of that date
+below); the linear-regression and balls-and-urns dynamics rows have still
+**not** been re-checked.
+
+### Correction, 2026-11-13
+
+The Markov rows pointed at `paper_data/markov/`, which holds the April runs:
+models trained on 1024-token sequences, evaluated with 16 prompts of length 8.
+The paper's Markov figures and the settings table come from the August runs
+(256-token contexts, 128 prompts of length 32), so the archived inputs did not
+reproduce the published figures, and the checklist's promise of "the
+precomputed data needed to redraw the key figures" did not hold for this
+family. The August inputs lived only in `outputs/`, which is gitignored, so no
+repository carried them.
+
+The inputs of all five Markov figures are now frozen in
+`paper_data/camera_ready/markov/` and each figure was checked to redraw
+byte-identical from them alone. Two quirks are recorded in that directory's
+README: the paper's `markov_sweep_prior_kl_ed_sw` has no KL panel (it is the
+output of `plot-markov-prior` *without* `--kl-csv`), and the paper's
+`markov_sweep_combined_2x2` is the `_sw` output installed under the `_2x2`
+name.
+
+`paper_data/markov/` is kept as the record of the April runs but no longer
+backs any figure. The Markov runs have no `wandb_kl_history.csv`, so the KL
+history comes from `training_log.csv` via `--training-root`.
 
 ### Regeneration of 2026-08-23
 
@@ -129,4 +155,6 @@ matrix legend).
    documented schedule for the transient-generalization figures.
 5. `paper_data/markov/dynamics_m8/` duplicates the M = 8 `wandb_kl_history.csv`
    of `paper_data/markov/sweep/runs/` (same run, same file): the sweep reads its
-   last row, the dynamics plot the whole trajectory. Deliberate.
+   last row, the dynamics plot the whole trajectory. Deliberate. Both are the
+   April runs, superseded by `paper_data/camera_ready/markov/`; the August runs
+   have no `wandb_kl_history.csv` at all.

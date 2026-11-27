@@ -1,8 +1,9 @@
 """The reliability-appendix figures, drawn from synthetic diagnostics CSVs.
 
 Every input CSV is written on demand, the first time the generator reads it, in
-the layout the rollout-diagnostics runs save. The test therefore exercises the
-real run names and file layout without duplicating the figure list.
+the layout the rollout-diagnostics runs and ``eval.py predictive-fidelity``
+save. The test therefore exercises the real run names and file layout without
+duplicating the figure list.
 """
 
 from __future__ import annotations
@@ -22,6 +23,8 @@ from bft_pmc.plotting.paper_style import BASE_FONT_PT
 REFS = ("memorising", "generalising")
 METRICS = ("ed", "sw")
 COUNTS = [16, 64, 256, 1024]
+FIDELITY_CHECKPOINTS = {"bau": "M32", "markov": "markov_M32"}
+"""Column prefixes predictive-fidelity writes: the scored checkpoints' names."""
 
 
 def _lengths(run: str) -> list[int]:
@@ -89,6 +92,16 @@ def synthetic_rows(path: Path) -> list[dict[str, object]]:
             for prompt in range(2)
             for t in (3, 1, 2)  # unsorted on purpose
         ]
+    if name.startswith("fidelity_") and name.endswith("_per_position.csv"):
+        checkpoint = FIDELITY_CHECKPOINTS[name.split("_")[1]]
+        return [
+            {
+                "position": t,
+                f"{checkpoint}_in_distribution": 1e-3 / (t + 1),
+                f"{checkpoint}_population": 0.1 + 1e-4 * t,
+            }
+            for t in range(500)
+        ]
     raise AssertionError(f"unexpected input {path}")
 
 
@@ -103,6 +116,9 @@ def drawn(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
             _write(path, synthetic_rows(path))
             if path.parent.name.startswith("lr_m32"):
                 (path.parent / "run_record.json").write_text('{"config": {}}')
+            if path.name.endswith("_per_position.csv"):
+                settings = path.name.replace("_per_position.csv", "_settings.json")
+                (path.parent / settings).write_text('{"seq_len": 500}')
         return real_read_rows(path)
 
     monkeypatch.setattr(appendix, "read_rows", read_rows)
@@ -117,11 +133,12 @@ def test_every_appendix_and_supplement_figure_is_drawn(
     _, paper = drawn
     manifest = json.loads((paper / appendix.MANIFEST_NAME).read_text())
     figures = sorted(entry["figure"] for entry in manifest["figures"])
-    assert len(figures) == 41
+    assert len(figures) == 42
     assert len(manifest["supplement"]) == 26
     for figure in figures:
         assert (paper / figure).stat().st_size > 0
     expected = {
+        "figures/reliability_agreement.pdf",
         "figures/reliability_length_prior.pdf",
         "figures/reliability_count_posterior.pdf",
         "figures/reliability_dimension_markov.pdf",
@@ -168,6 +185,29 @@ def test_manifest_records_the_plotted_values_and_input_hashes(
     )
 
 
+def test_agreement_figure_reads_the_fidelity_results_beside_the_runs(
+    drawn: tuple[Path, Path],
+) -> None:
+    root, paper = drawn
+    manifest = json.loads((paper / appendix.MANIFEST_NAME).read_text())
+    (entry,) = [
+        e
+        for e in manifest["figures"]
+        if e["figure"] == "figures/reliability_agreement.pdf"
+    ]
+    bau, markov = entry["panels"]
+    assert (bau["label"], markov["label"]) == ("Balls-and-urns", "1-Markov")
+    assert bau["x"] == [float(t) for t in range(500)]
+    assert bau["series"]["in_distribution"][0] == pytest.approx(1e-3)
+    assert markov["series"]["population"][-1] == pytest.approx(0.1 + 1e-4 * 499)
+    fidelity = root.parent / "predictive_fidelity"
+    assert [source["path"] for source in entry["inputs"]] == [
+        str(fidelity / f"fidelity_{family}_{suffix}")
+        for family in ("bau", "markov")
+        for suffix in ("per_position.csv", "settings.json")
+    ]
+
+
 def test_markov_n500_runs_follow_their_submission_names() -> None:
     assert appendix.markov_n500_run(32) == "markov_m32_n500_pi544"
     assert appendix.markov_n500_run(64) == "markov_m64_n500"
@@ -187,6 +227,7 @@ def test_print_widths_match_the_paper() -> None:
     """The widths icl2.tex prints the Appendix D figures at."""
     families = ("lr", "bau", "markov")
     expected = {
+        "reliability_agreement.pdf": 0.75,
         **{f"reliability_path_stability_{f}.pdf": 0.60 for f in families},
         **{
             f"reliability_{kind}_{source}.pdf": 0.75

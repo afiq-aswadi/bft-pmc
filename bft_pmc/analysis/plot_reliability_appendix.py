@@ -1,7 +1,9 @@
 """Draw the PMC reliability figures of Appendix D and the supplement.
 
 Every figure is redrawn from the CSVs that the rollout-diagnostics runs saved
-under ``outputs/pmc_diagnostics/``; no checkpoint is loaded and nothing is
+under ``outputs/pmc_diagnostics/``, except the next-token agreement figure,
+which reads the ``eval.py predictive-fidelity`` CSVs in the ``predictive_fidelity``
+directory beside it; no checkpoint is loaded and nothing is
 generated. Next to the figures the script writes
 ``reliability_figure_manifest.json``, which records for every figure its
 SHA-256, the SHA-256 of each input CSV and of the run record beside it, and
@@ -19,6 +21,10 @@ Figures are written as ``<paper-dir>/figures/<name>.pdf``:
     Recovery error against latent dimension and task diversity (D.4).
 ``reliability_taskdiv_length_{lr,bau,markov}``
     Recovery error against N at each task diversity (D.5).
+``reliability_agreement``
+    Symmetrized KL between the model's next-token distribution and the exact
+    predictive at each position, balls-and-urns and 1-Markov (next-token
+    agreement check).
 ``reliability_path_stability_{lr,bau,markov}``
     Path-stability (jellyfish) curves to N = 500 (D.1).
 ``reliability_supp_*``
@@ -58,6 +64,7 @@ COLORS = {"memorising": "#2ca02c", "generalising": "#1f77b4"}
 
 FIGURE_WIDTH_IN = 5.5
 PRINT_WIDTH = {
+    "reliability_agreement.pdf": 0.75,
     **{f"reliability_path_stability_{f}.pdf": 0.60 for f in ("lr", "bau", "markov")},
     **{
         f"reliability_{kind}_{source}.pdf": 0.75
@@ -73,6 +80,25 @@ PRINT_WIDTH = {
 print at full width."""
 CREATOR = "plot_reliability_appendix.py"
 MANIFEST_NAME = "reliability_figure_manifest.json"
+
+AGREEMENT_PANELS = [
+    ("Balls-and-urns", "bau", "M32"),
+    ("1-Markov", "markov", "markov_M32"),
+]
+"""(panel title, family, checkpoint) of the next-token agreement figure. The
+checkpoint label prefixes the per-position columns that ``eval.py
+predictive-fidelity`` writes; these are the M = 32 models that
+``slurm/predictive_fidelity.slurm`` scores."""
+AGREEMENT_LAWS = {
+    "in_distribution": ("In-distribution vs. memorizing", COLORS["memorising"]),
+    "population": ("Out-of-distribution vs. generalizing", COLORS["generalising"]),
+}
+"""Sequence law -> (legend label, colour). Pool sequences are scored against
+the memorizing predictive, fresh ones against the generalizing predictive."""
+TRAINING_CONTEXT_END = 255
+"""First position that no training sequence covers, in both families.
+Balls-and-urns trains on 255 observations after BOS and has read t of them at
+position t; 1-Markov trains on 256 and has read t + 1."""
 
 Panel = dict[str, Any]
 Spec = tuple[str, str]
@@ -103,11 +129,14 @@ class ReliabilityFigures:
     """Draws figures into ``destination/figures`` and collects their manifest.
 
     ``root`` is the directory holding one subdirectory per diagnostics run,
-    normally ``outputs/pmc_diagnostics``.
+    normally ``outputs/pmc_diagnostics``. The ``eval.py predictive-fidelity``
+    CSVs are read from ``predictive_fidelity`` beside it, where that command
+    writes them by default (``outputs/predictive_fidelity``).
     """
 
     def __init__(self, root: Path, destination: Path) -> None:
         self.root = root
+        self.fidelity_root = root.parent / "predictive_fidelity"
         self.destination = destination
         self.figures: list[dict[str, Any]] = []
         self.supplement: list[dict[str, Any]] = []
@@ -332,6 +361,75 @@ class ReliabilityFigures:
         self.legend(fig, "aggregate")
         self.finish(fig, name, [path], panels)
 
+    def agreement(self) -> None:
+        """Next-token agreement with the exact predictive, one panel per family.
+
+        Plots the per-position symmetrized KL that ``eval.py
+        predictive-fidelity`` saved (``slurm/predictive_fidelity.slurm``: 256
+        sequences of 500 observations at M = 32): in-distribution sequences
+        against the memorizing predictive and out-of-distribution sequences
+        against the generalizing predictive. The dashed rule marks the
+        training-context boundary. Markov is scored past it by the same
+        position rescaling (256/544) as its other panels in the appendix.
+        """
+        name = "reliability_agreement.pdf"
+        width_frac = PRINT_WIDTH[name]
+        width = FIGURE_WIDTH_IN * width_frac
+        # Margins in inches: tick and axis labels, panel titles and the legend.
+        left, right, gap, bottom, top = 0.52, 0.10, 0.42, 0.36, 0.50
+        panel_width = (width - left - right - gap) / 2
+        height = bottom + top + 0.8 * panel_width
+        apply_paper_style(width, width_frac)
+        fig, axes = plt.subplots(1, 2, figsize=(width, height))
+        fig.subplots_adjust(
+            left=left / width,
+            right=1 - right / width,
+            bottom=bottom / height,
+            top=1 - top / height,
+            wspace=gap / panel_width,
+        )
+        panels: list[Panel] = []
+        inputs: list[Path] = []
+        for ax, (label, family, checkpoint) in zip(axes, AGREEMENT_PANELS):
+            path = self.fidelity_root / f"fidelity_{family}_per_position.csv"
+            data = read_rows(path)
+            inputs += [path, path.with_name(f"fidelity_{family}_settings.json")]
+            x = [float(row["position"]) for row in data]
+            panel: Panel = {
+                "label": label,
+                "metric": "symmetrised_kl",
+                "x": x,
+                "series": {},
+            }
+            for law, (_, color) in AGREEMENT_LAWS.items():
+                y = [float(row[f"{checkpoint}_{law}"]) for row in data]
+                ax.plot(x, y, color=color, lw=0.9)
+                panel["series"][law] = y
+            ax.axvline(TRAINING_CONTEXT_END, color=".4", ls="--", lw=0.8)
+            ax.set_yscale("log")
+            ax.set_xlim(0, 500)
+            ax.set_xticks([0, 100, 200, 300, 400, 500])
+            ax.set_xlabel("Position")
+            ax.set_title(label)
+            ax.spines[["top", "right"]].set_visible(False)
+            ax.grid(alpha=0.14, lw=0.5)
+            ax.tick_params(length=2.5, width=0.6)
+            panels.append(panel)
+        axes[0].set_ylabel("Symmetrized KL")
+        fig.legend(
+            handles=[
+                Line2D([], [], color=color, lw=1.15, label=text)
+                for text, color in AGREEMENT_LAWS.values()
+            ],
+            loc="upper center",
+            bbox_to_anchor=(0.5, 1),
+            ncol=2,
+            frameon=False,
+            columnspacing=1.2,
+            handlelength=1.7,
+        )
+        self.finish(fig, name, inputs, panels)
+
     def jellyfish(self) -> None:
         """Path-stability curves, one standalone figure per family.
 
@@ -488,6 +586,10 @@ def draw_all(root: Path, destination: Path) -> ReliabilityFigures:
             False,
         )
 
+    # Next-token agreement with the exact predictive: no rollouts, read from
+    # the predictive-fidelity results beside the diagnostics runs.
+    figures.agreement()
+
     # D.1: path stability.
     figures.jellyfish()
 
@@ -569,7 +671,8 @@ def main(argv: Sequence[str] | None = None) -> None:
         "--diagnostics-root",
         type=Path,
         default=PMC_DIAGNOSTICS,
-        help="directory holding one subdirectory per diagnostics run",
+        help="directory holding one subdirectory per diagnostics run; the "
+        "next-token agreement figure reads predictive_fidelity/ beside it",
     )
     args = parser.parse_args(argv)
     figures = draw_all(args.diagnostics_root, args.paper_dir)

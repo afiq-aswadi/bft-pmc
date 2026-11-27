@@ -24,6 +24,7 @@ from bft_pmc.linear_regression import plot_sweep_prior as lr_prior
 from bft_pmc.markov import plot_dynamics_combined as markov_dynamics
 from bft_pmc.markov import plot_sweep_combined as markov_sweep
 from bft_pmc.markov import plot_sweep_prior as markov_prior
+from bft_pmc.markov.kl_history import load_kl_history
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 PAPER_DATA = REPO_ROOT / "paper_data"
@@ -327,6 +328,75 @@ def test_markov_aggregate_figure_entry_points(
         "markov_prior.png",
         "markov_prior.png",
     ]
+
+
+def test_camera_ready_markov_inputs_draw_the_paper_figures(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    saved_figures: list[Path],
+) -> None:
+    """The paper's Markov figures redraw from paper_data/camera_ready/markov alone.
+
+    These August runs wrote no wandb_kl_history.csv: each run's KL history comes
+    from its training log, through --training-root.
+    """
+    root = PAPER_DATA / "camera_ready/markov"
+    runs = sorted((root / "sweep/runs").iterdir())
+    assert len(runs) == 10
+    for run_dir in runs:
+        history = load_kl_history(run_dir, training_root=root / "training")
+        assert history is not None and not history.empty, run_dir.name
+
+    training = ["--training-root", str(root / "training")]
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_sweep_combined.py",
+            "--runs-dir",
+            str(root / "sweep/runs"),
+            "--metrics-csv",
+            str(root / "sweep/metrics.csv"),
+            *training,
+            "--out-path",
+            str(tmp_path / "markov_sweep_combined.png"),
+        ],
+    )
+    markov_sweep.main()
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_dynamics_combined.py",
+            "--runs-dir",
+            str(root / "sweep/runs"),
+            *training,
+            "--out-dir",
+            str(tmp_path),
+        ],
+    )
+    markov_dynamics.main()
+    # The paper's prior figure is the two-panel one drawn without --kl-csv.
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "plot_sweep_prior.py",
+            "--metrics-csv",
+            str(root / "sweep/metrics.csv"),
+            "--out-path",
+            str(tmp_path / "markov_sweep_prior_kl_ed_sw.png"),
+        ],
+    )
+    markov_prior.main()
+    # The paper's five figures; its *_2x2 ones are the *_2x2_sw outputs.
+    assert {
+        "markov_sweep_combined.png",
+        "markov_sweep_combined_2x2_sw.png",
+        "markov_sweep_prior_kl_ed_sw.png",
+        "dynamics_M8.png",
+        "dynamics_M8_2x2_sw.png",
+    } <= {path.name for path in saved_figures}
 
 
 def test_markov_paper_twins_pair_kl_with_one_posterior_metric(

@@ -147,15 +147,16 @@ with no checkpoints, GPU or network:
 - the Beta-Bernoulli figures (Figure 1 and the grid of Appendix E) and the
   identifiability example (Figure 2);
 - the camera-ready linear-regression and balls-and-urns task-diversity
-  figures and all 41 reliability figures of Appendix D and the supplement,
+  figures, the five Markov task-diversity, prior and training-dynamics
+  figures, and all 42 reliability figures of Appendix D and the supplement,
   from the inputs frozen in
   [`paper_data/camera_ready/`](paper_data/camera_ready/README.md), checked to
   render pixel-identical to the paper's;
 - the aggregate task-diversity, prior and training-dynamics figures of all
   three families from the *original* runs in [`paper_data/`](paper_data/README.md).
-  The camera-ready LR and balls-and-urns sweep and prior figures were instead
-  drawn from the retrained runs (no positional encoding, 256-position
-  contexts, 32-observation prompts).
+  The paper's Markov figures and its LR and balls-and-urns sweep and prior
+  figures were instead drawn from the retrained runs (256-position contexts,
+  32-observation prompts, no positional encoding for LR and balls-and-urns).
 
 **Everything else** needs outputs of the full experiments: the marginal
 figures read PMC sample bundles, and the camera-ready prior panels the
