@@ -1,0 +1,18 @@
+{
+  "self_test": false,
+  "family": "markov",
+  "checkpoint_paths": [
+    "checkpoints/markov/task_diversity/markov_M32/checkpoint_step_100000.pt"
+  ],
+  "config_path": "outputs/markov/training/markov_M32/resolved_config.yaml",
+  "seq_len": 500,
+  "n_sequences": 256,
+  "batch_size": 64,
+  "alpha_value": 1.0,
+  "n_ctx_override": null,
+  "seq_len_override": 544,
+  "rope_scaling": "interpolate",
+  "device": "auto",
+  "seed": 42,
+  "output_dir": "outputs/predictive_fidelity"
+}

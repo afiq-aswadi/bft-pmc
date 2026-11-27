@@ -1,0 +1,2 @@
+checkpoint,path,family,seq_len,n_sequences,sym_kl_in_distribution,sym_kl_population
+markov_M32,checkpoints/markov/task_diversity/markov_M32/checkpoint_step_100000.pt,markov,500,256,0.10002324916422367,0.28359970450401306

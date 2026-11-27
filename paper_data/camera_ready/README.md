@@ -10,7 +10,8 @@ the repository alone. `SHA256SUMS` lists every file with its checksum and the
 | `lr/sweep/metrics.csv` | the no-positional-encoding linear-regression sweep (`outputs/lr/sweep_analysis_none/sweep_20260821_221637/`) | `lr_sweep_combined_2x2` |
 | `bau/sweep/metrics.csv` | the no-positional-encoding balls-and-urns sweep (`outputs/bau/sweep_analysis_none/20260819_194316/`) | `bau_sweep_posterior{,_2x2}` |
 | `markov/sweep/`, `markov/training/` | the post-retraining Markov sweep (128 evaluation prompts of length 32, 256-token contexts): `metrics.csv` with both the prior and posterior rows for M = 4 to 2048, the prior-predictive KL, each run's `metrics.csv`, and the `training_log.csv` that supplies the KL history those runs have no `wandb_kl_history.csv` for (`outputs/markov/sweep_analysis/`, `outputs/markov/training/`) | `markov_sweep_combined{,_2x2}`, `markov_sweep_prior_kl_ed_sw`, `markov_dynamics_M8{,_2x2}` |
-| `pmc_diagnostics/<run>/` | the recovery-against-length and -count CSVs, dimension and task-diversity aggregates, path-stability table, and the run record of every diagnostics run the reliability figures read (37 runs) | all 41 `reliability_*` figures of Appendix D and the supplement |
+| `pmc_diagnostics/<run>/` | the recovery-against-length and -count CSVs, dimension and task-diversity aggregates, path-stability table, and the run record of every diagnostics run the reliability figures read (37 runs) | the other 41 `reliability_*` figures of Appendix D and the supplement |
+| `predictive_fidelity/` | the next-token fidelity results of `slurm/predictive_fidelity.slurm` for balls-and-urns and 1-Markov at M = 32: the means quoted in the text, the symmetrized KL at each position, and the settings of each run (`outputs/predictive_fidelity/`) | `reliability_agreement` |
 
 Redraw them with:
 
@@ -32,7 +33,8 @@ uv run eval.py plot-markov-dynamics --runs-dir paper_data/camera_ready/markov/sw
     --out-dir outputs/camera_ready/markov/dynamics
 ```
 
-`scripts/reproduce_paper.sh` runs the same commands.
+`scripts/reproduce_paper.sh` runs the same commands. `plot-reliability` reads
+`predictive_fidelity/` from beside `--diagnostics-root`.
 
 ## Verification
 

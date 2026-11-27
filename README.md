@@ -148,7 +148,7 @@ with no checkpoints, GPU or network:
   identifiability example (Figure 2);
 - the camera-ready linear-regression and balls-and-urns task-diversity
   figures, the five Markov task-diversity, prior and training-dynamics
-  figures, and all 41 reliability figures of Appendix D and the supplement,
+  figures, and all 42 reliability figures of Appendix D and the supplement,
   from the inputs frozen in
   [`paper_data/camera_ready/`](paper_data/camera_ready/README.md), checked to
   render pixel-identical to the paper's;

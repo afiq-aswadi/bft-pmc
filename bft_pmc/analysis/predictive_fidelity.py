@@ -33,12 +33,13 @@ off-by-one in the indexing shows up immediately.
     uv run eval.py predictive-fidelity --family markov --checkpoint-paths ... \
         --config-path outputs/markov/training/<run>/resolved_config.yaml
 
-The paper's numbers (next-token fidelity, in the appendix on sufficient
-conditions for PMC) come from ``slurm/predictive_fidelity.slurm``: 256
-sequences of 500 tokens per family at M = 32. Each run writes
-``fidelity_<family>.csv`` (one row per checkpoint), a per-position CSV and the
-settings it ran with. This replaces the balls-and-urns-only script of the
-rebuttal period, which wrote ``paper_data/rebuttal_diagnostics/fidelity/``.
+The paper's numbers (the next-token agreement check of the reliability
+appendix) come from ``slurm/predictive_fidelity.slurm``: 256 sequences of 500
+tokens per family at M = 32. Each run writes ``fidelity_<family>.csv`` (one row
+per checkpoint), a per-position CSV and the settings it ran with; ``eval.py
+plot-reliability`` draws the per-position CSVs as ``reliability_agreement.pdf``.
+This replaces the balls-and-urns-only script of the rebuttal period, which
+wrote ``paper_data/rebuttal_diagnostics/fidelity/``.
 """
 
 from __future__ import annotations

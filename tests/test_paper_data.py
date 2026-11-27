@@ -35,7 +35,12 @@ def test_camera_ready_inputs_match_their_checksums() -> None:
 
 def test_frozen_diagnostics_hold_every_reliability_input(tmp_path: Path) -> None:
     figures = draw_all(CAMERA_READY / "pmc_diagnostics", tmp_path)
-    assert len(figures.figures) == 41
+    assert len(figures.figures) == 42
     for entry in figures.figures:
         for source in entry["inputs"]:
-            assert source["path"].startswith("paper_data/camera_ready/pmc_diagnostics/")
+            assert source["path"].startswith(
+                (
+                    "paper_data/camera_ready/pmc_diagnostics/",
+                    "paper_data/camera_ready/predictive_fidelity/",
+                )
+            )

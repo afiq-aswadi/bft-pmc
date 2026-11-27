@@ -3,7 +3,7 @@
 # or network access:
 #   - the Beta-Bernoulli figures (Figure 1) and the identifiability example (Figure 2);
 #   - from paper_data/camera_ready/: the camera-ready LR and balls-and-urns sweep
-#     figures and all 41 reliability figures of Appendix D and the supplement;
+#     figures and all 42 reliability figures of Appendix D and the supplement;
 #   - from paper_data/camera_ready/markov/: the paper's five Markov sweep, prior
 #     and training-dynamics figures (the August runs);
 #   - from paper_data/{lr,bau,markov}/: the aggregate task-diversity, prior and

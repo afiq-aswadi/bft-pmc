@@ -12,7 +12,7 @@ Several camera-ready figures were redrawn from the retrained runs instead (no
 positional encoding for LR and balls-and-urns, 256 positions everywhere, a
 32-observation prompt). Their inputs are frozen separately in
 [`camera_ready/`](camera_ready/README.md): the LR and balls-and-urns sweep
-metrics and every input of the 41 reliability figures.
+metrics and every input of the 42 reliability figures.
 The paper's Markov figures are all drawn from `camera_ready/markov/` (the
 August runs); `markov/` is kept as the record of the April runs and backs none
 of them.

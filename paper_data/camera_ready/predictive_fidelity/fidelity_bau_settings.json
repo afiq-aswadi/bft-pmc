@@ -1,0 +1,18 @@
+{
+  "self_test": false,
+  "family": "bau",
+  "checkpoint_paths": [
+    "checkpoints/bau/task_diversity_none/M32/checkpoint_step_100000.pt"
+  ],
+  "config_path": null,
+  "seq_len": 500,
+  "n_sequences": 256,
+  "batch_size": 64,
+  "alpha_value": 1.0,
+  "n_ctx_override": 1024,
+  "seq_len_override": null,
+  "rope_scaling": "interpolate",
+  "device": "auto",
+  "seed": 42,
+  "output_dir": "outputs/predictive_fidelity"
+}

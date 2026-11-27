@@ -1,0 +1,2 @@
+checkpoint,path,family,seq_len,n_sequences,sym_kl_in_distribution,sym_kl_population
+M32,checkpoints/bau/task_diversity_none/M32/checkpoint_step_100000.pt,bau,500,256,0.000477933521324303,0.24371672421693802
