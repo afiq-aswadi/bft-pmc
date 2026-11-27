@@ -12,7 +12,7 @@ against.
 The build scripts read from local checkouts of the code repository
 (`../pfn-memorising-generalising`) and the paper sources (`../icl2latex`), which
 sit beside this folder. The page itself links only to published copies: the
-paper on OpenReview, and the supplement and run records in
+paper on OpenReview, and the code and run records in
 [afiq-aswadi/bft-pmc](https://github.com/afiq-aswadi/bft-pmc).
 
 ## Viewing it
